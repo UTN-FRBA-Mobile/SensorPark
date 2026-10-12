@@ -1,2 +1,110 @@
 # SensorPark
-Sensor Park
+
+App Android que muestra en tiempo real qué lugares están libres en estacionamientos, permite
+reservarlos y avisa con notificaciones los cambios que le importan al conductor. La ocupación de
+cada cochera la informa un sensor, que en este proyecto se simula por software.
+
+Kotlin · Jetpack Compose · Material 3 · Hilt · Navigation Compose · Firebase (Auth, Firestore,
+Cloud Functions, FCM) · Google Maps.
+
+## Cómo correrlo por primera vez
+
+Necesitás Android Studio con soporte para AGP 9.2 y el SDK de Android 36.1 (lo ofrece instalar al
+abrir el proyecto). No hace falta instalar Gradle ni un JDK aparte.
+
+1. Cloná el repo y abrilo en Android Studio.
+
+   ```
+   git clone git@github.com:UTN-FRBA-Mobile/SensorPark.git
+   ```
+
+2. Conseguí `google-services.json`: pedí que te sumen al proyecto de Firebase, entrá a la consola,
+   *Configuración del proyecto → Tus apps → SensorPark (Android)*, descargalo y copialo a
+   `app/google-services.json`. Sin ese archivo el proyecto no compila.
+
+3. Completá `local.properties` en la raíz (Android Studio lo crea solo con `sdk.dir`):
+
+   ```properties
+   sdk.dir=C\:\\Users\\<vos>\\AppData\\Local\\Android\\Sdk
+   MAPS_API_KEY=<key de Maps SDK for Android>
+   ```
+
+   Sin `MAPS_API_KEY` la app compila y corre igual, pero el mapa se ve gris. La key está
+   restringida por SHA-1: pasale a quien administra el proyecto el SHA-1 de tu keystore de debug
+   (`./gradlew signingReport`) para que lo agregue.
+
+4. Sincronizá Gradle y corré la configuración `app` en un emulador o dispositivo con Google Play
+   Services.
+
+5. Creá una cuenta desde la app. Después de unos segundos de "Preparando tu cuenta…" aparece el
+   inicio provisorio, con un botón por pantalla. **Diagnóstico de configuración** verifica contra
+   el proyecto real Auth, el rol, Firestore, FCM, Functions y Maps.
+
+`google-services.json`, `local.properties` y `functions/.env` están en el `.gitignore`: ninguna
+clave se sube al repositorio.
+
+## Módulos
+
+| Módulo | Qué contiene |
+|---|---|
+| `app` | `MainActivity` (Activity única), navegación principal, configuración de Hilt, login, inicio y preferencias |
+| `domain` | Modelos, interfaces de repositorios y casos de uso. Kotlin puro: sin Android ni Firebase |
+| `data` | Implementación de los repositorios, Firebase, notificaciones. Acá van también Room, Retrofit, DataStore y WorkManager |
+| `core/ui` | Tema y componentes comunes de Compose |
+| `feature/mapa` | Mapa de estacionamientos |
+| `feature/estacionamiento` | Detalle de un estacionamiento |
+| `feature/reservas` | Reservar y mis reservas |
+| `feature/checkin` | Check-in |
+| `feature/admin` | Administración |
+
+Reglas de dependencia: los `feature` dependen de `domain` y `core/ui`, nunca entre sí ni de `data`.
+`data` implementa las interfaces de `domain`. `app` es el único que conoce a todos y los une.
+
+### Cómo se agrega algo
+
+- **Una pantalla:** el composable va en su `feature` y recibe lambdas para navegar (no conoce las
+  rutas). La ruta se declara en `app/.../navegacion/Ruta.kt` y se conecta en `NavegacionApp.kt`.
+- **Un repositorio:** la interfaz en `domain/repository`, la implementación en `data` y el `@Binds`
+  en `data/.../di/RepositoriosModule.kt`. Los ViewModels (`@HiltViewModel`) piden la interfaz.
+- **Una dependencia:** siempre por el catálogo `gradle/libs.versions.toml`, nunca con la versión
+  escrita en un `build.gradle.kts`.
+
+Deep link disponible: `sensorpark://reserva/{id}` abre *Mis reservas* en esa reserva. Para probarlo:
+
+```
+adb shell am start -a android.intent.action.VIEW -d "sensorpark://reserva/123" com.sensorpark.app
+```
+
+## Ramas
+
+- `main` es el entregable: siempre compila.
+- Cada tarea se hace en una rama propia que sale de `main` y vuelve por Pull Request.
+
+## Backend (Firebase)
+
+Las reglas, los índices y las functions no viajan en el APK: se despliegan aparte con la
+[Firebase CLI](https://firebase.google.com/docs/cli).
+
+```
+firebase login
+firebase use --add
+firebase deploy --only firestore:rules,firestore:indexes,functions
+```
+
+- `firestore.rules` y `firestore.indexes.json`: reglas e índices de la base `(default)`.
+- `functions/`: Cloud Functions (Node 22). Asignan el rol de cada usuario como custom claim, mandan
+  las pushes y simulan los sensores. Antes de desplegar, copiá `functions/.env.example` a
+  `functions/.env` y poné en `ADMIN_EMAILS` los emails que entran como administradores.
+- `firestore-tests/`: tests de las reglas contra el emulador. Necesitan Java 21 o superior (sirve
+  el `jbr` de Android Studio como `JAVA_HOME`).
+
+  ```
+  cd firestore-tests && npm install && cd ..
+  firebase emulators:exec --only firestore --project demo-sensorpark "npm --prefix firestore-tests test"
+  ```
+
+## Tests
+
+```
+./gradlew :domain:test
+```

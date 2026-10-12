@@ -4,8 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.sensorpark.app.ui.RaizApp
-import com.sensorpark.app.ui.theme.SensorParkTheme
+import com.sensorpark.app.navegacion.NavegacionApp
+import com.sensorpark.core.ui.theme.SensorParkTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SensorParkTheme {
-                RaizApp()
+                NavegacionApp()
             }
         }
     }
