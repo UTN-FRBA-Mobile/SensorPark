@@ -29,9 +29,11 @@ abrir el proyecto). No hace falta instalar Gradle ni un JDK aparte.
    MAPS_API_KEY=<key de Maps SDK for Android>
    ```
 
-   Sin `MAPS_API_KEY` la app compila y corre igual, pero el mapa se ve gris. La key está
-   restringida por SHA-1: pasale a quien administra el proyecto el SHA-1 de tu keystore de debug
-   (`./gradlew signingReport`) para que lo agregue.
+   Sin `MAPS_API_KEY` la app compila y corre igual, pero el mapa se ve gris. Cada integrante
+   crea su propia key en [Google Cloud Console](https://console.cloud.google.com): habilitar
+   *Maps SDK for Android*, y en *Credenciales → Crear credenciales → Clave de API* restringirla
+   a apps Android con package `com.sensorpark.app` y el SHA-1 de tu keystore de debug
+   (`./gradlew signingReport`).
 
 4. Sincronizá Gradle y corré la configuración `app` en un emulador o dispositivo con Google Play
    Services.
