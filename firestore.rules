@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// Firestore deniega todo lo que no tenga un `allow` explícito: colección nueva = regla nueva.
+// Las reglas no son filtros: la query del cliente tiene que llevar el mismo `where` que la regla exige.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() { return request.auth != null; }
+    function esDuenio(uid) { return autenticado() && request.auth.uid == uid; }
+
+    // El rol es un custom claim que sólo asigna el backend (functions/index.js).
+    function tieneRol(rol) { return autenticado() && request.auth.token.rol == rol; }
+    function esAdmin() { return tieneRol('ADMIN'); }
+
+    // get() porque se evalúa también desde la subcolección de cocheras, donde `resource` es el hijo.
+    function administra(eid) {
+      return tieneRol('ADMIN_ESTACIONAMIENTO') &&
+        request.auth.uid in get(/databases/$(database)/documents/estacionamientos/$(eid)).data.adminUids;
+    }
+
+    // Perfil, token FCM y preferencias. El dueño nunca puede escribir su propio `rol`.
+    match /users/{uid} {
+      allow read: if esDuenio(uid) || esAdmin();
+      allow create: if esDuenio(uid) && !('rol' in request.resource.data);
+      allow update: if esDuenio(uid) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rol']);
+    }
+
+    match /estacionamientos/{eid} {
+      allow read: if autenticado();
+      allow create, delete: if esAdmin();
+      allow update: if esAdmin() || administra(eid);
+
+      // La ocupación la escribe el simulador de sensores con el Admin SDK, que no pasa por las reglas.
+      match /cocheras/{cid} {
+        allow read: if autenticado();
+        allow write: if esAdmin() || administra(eid);
+      }
+    }
+
+    match /reservas/{rid} {
+      allow read: if esAdmin() || (autenticado() && resource.data.conductorUid == request.auth.uid);
+      allow create: if tieneRol('CONDUCTOR') && request.resource.data.conductorUid == request.auth.uid;
+      allow delete: if autenticado() && resource.data.conductorUid == request.auth.uid;
+    }
+  }
+}
