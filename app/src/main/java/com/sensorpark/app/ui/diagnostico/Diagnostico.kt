@@ -3,8 +3,13 @@ package com.sensorpark.app.ui.diagnostico
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -26,11 +31,18 @@ private val BuenosAires = LatLng(-34.6037, -58.3816)
 
 /** Lista de chequeos de la configuración de Firebase y Maps. */
 @Composable
-fun Diagnostico(modifier: Modifier = Modifier, vm: DiagnosticoViewModel = hiltViewModel()) {
+fun PantallaDiagnostico(vm: DiagnosticoViewModel = hiltViewModel()) {
     val chequeos by vm.chequeos.collectAsStateWithLifecycle()
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Diagnóstico de configuración", style = MaterialTheme.typography.titleMedium)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .safeDrawingPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Diagnóstico de configuración", style = MaterialTheme.typography.headlineMedium)
         chequeos.forEach { FilaChequeo(it) }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -15,7 +15,7 @@ android {
 
     defaultConfig {
         applicationId = "com.sensorpark.app"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
@@ -47,27 +47,32 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain"))
+    implementation(project(":data"))
+    implementation(project(":core:ui"))
+    implementation(project(":feature:mapa"))
+    implementation(project(":feature:estacionamiento"))
+    implementation(project(":feature:reservas"))
+    implementation(project(":feature:checkin"))
+    implementation(project(":feature:admin"))
+
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
+
+    implementation(libs.activity.compose)
+    implementation(libs.core.ktx)
+    implementation(libs.navigation.compose)
+    implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.lifecycle.runtime.compose)
+
+    // Sólo por la pantalla de diagnóstico, que habla con Firebase y Maps directamente.
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.functions)
     implementation(libs.coroutines.play.services)
-
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
-    implementation(libs.hilt.navigation.compose)
-
-    implementation(platform(libs.compose.bom))
-    implementation(libs.activity.compose)
-    implementation(libs.core.ktx)
-    implementation(libs.material3)
-    implementation(libs.navigation.compose)
-    implementation(libs.lifecycle.viewmodel.compose)
-    implementation(libs.lifecycle.runtime.compose)
-    implementation(libs.ui)
-    implementation(libs.ui.graphics)
-    implementation(libs.ui.tooling.preview)
     implementation(libs.play.services.maps)
     implementation(libs.maps.compose)
 

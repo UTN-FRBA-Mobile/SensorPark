@@ -24,3 +24,11 @@ dependencyResolutionManagement {
 
 rootProject.name = "SensorPark"
 include(":app")
+include(":domain")
+include(":data")
+include(":core:ui")
+include(":feature:mapa")
+include(":feature:estacionamiento")
+include(":feature:reservas")
+include(":feature:checkin")
+include(":feature:admin")
