@@ -1,0 +1,17 @@
+{
+  "name": "sensorpark-functions",
+  "description": "Cloud Functions de SensorPark: roles, pushes y simulador de sensores",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.1.0"
+  },
+  "private": true
+}
