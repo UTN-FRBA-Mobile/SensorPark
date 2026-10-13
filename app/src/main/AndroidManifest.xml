@@ -25,13 +25,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- sensorpark://reserva/{id} -->
+            <!-- sensorpark://reservation/{id} -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:host="reserva"
+                    android:host="reservation"
                     android:scheme="sensorpark" />
             </intent-filter>
         </activity>

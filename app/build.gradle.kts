@@ -50,9 +50,9 @@ dependencies {
     implementation(project(":domain"))
     implementation(project(":data"))
     implementation(project(":core:ui"))
-    implementation(project(":feature:mapa"))
-    implementation(project(":feature:estacionamiento"))
-    implementation(project(":feature:reservas"))
+    implementation(project(":feature:map"))
+    implementation(project(":feature:parking"))
+    implementation(project(":feature:reservations"))
     implementation(project(":feature:checkin"))
     implementation(project(":feature:admin"))
 

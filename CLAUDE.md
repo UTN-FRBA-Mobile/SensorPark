@@ -7,7 +7,9 @@ Cloud Function.
 Este archivo resume cómo está armado el proyecto y qué hay que saber para tocar el código. La
 puesta en marcha paso a paso (clonar, `google-services.json`, key de Maps) está en el README.
 
-Código, comentarios, commits y nombres de dominio van en español.
+El código va en inglés: módulos, paquetes, clases, funciones, colecciones y campos de Firestore, y
+nombres de Cloud Functions. Los comentarios, los commits, la documentación y los textos que ve el
+usuario van en español.
 
 ## Comandos
 
@@ -34,7 +36,7 @@ firebase emulators:exec --only firestore --project demo-sensorpark "npm --prefix
 
 # Emuladores locales, para probar sin tocar la base real
 firebase emulators:start
-node functions/scripts/sembrar.js       # en otra terminal: carga datos y usuarios de prueba
+node functions/scripts/seed-emulators.js       # en otra terminal: carga datos y usuarios de prueba
 
 # Despliegue: reglas, índices y functions no viajan en el APK
 firebase deploy --only firestore:rules,firestore:indexes
@@ -55,11 +57,11 @@ Los tres están en el `.gitignore`. No hay que commitearlos ni pegar su contenid
 
 | Módulo | Qué contiene |
 |---|---|
-| `app` | Activity única, navegación (`navegacion/Ruta.kt`, `NavegacionApp.kt`), login, inicio, preferencias y la pantalla de diagnóstico |
+| `app` | Activity única, navegación (`navigation/Route.kt`, `AppNavigation.kt`), login, inicio, preferencias y la pantalla de diagnóstico |
 | `domain` | Kotlin puro: modelos, interfaces de repositorios y casos de uso. Sin Android ni Firebase |
 | `data` | Implementaciones con Firebase, módulos de Hilt, servicio de FCM y notificaciones |
 | `core/ui` | Tema y componentes comunes; expone Compose y Material 3 con `api` |
-| `feature/{mapa,estacionamiento,reservas,checkin,admin}` | Una funcionalidad cada uno |
+| `feature/{map,parking,reservations,checkin,admin}` | Una funcionalidad cada uno |
 
 Quién puede depender de quién:
 
@@ -70,9 +72,9 @@ Quién puede depender de quién:
 Cómo se agrega algo:
 
 - **Una pantalla:** el composable va en su `feature` y recibe lambdas para navegar. La ruta se
-  declara en `app/.../navegacion/Ruta.kt` y se conecta en `NavegacionApp.kt`.
+  declara en `app/.../navigation/Route.kt` y se conecta en `AppNavigation.kt`.
 - **Un repositorio:** interfaz en `domain/repository`, implementación en `data` y `@Binds` en
-  `data/.../di/RepositoriosModule.kt`.
+  `data/.../di/RepositoriesModule.kt`.
 - **Una dependencia:** siempre en `gradle/libs.versions.toml`, nunca con la versión escrita en un
   `build.gradle.kts`.
 
@@ -100,58 +102,59 @@ Firestore y las functions están en `southamerica-east1`. La región está escri
 
 | Colección | Qué guarda | Quién escribe |
 |---|---|---|
-| `usuarios/{uid}` | Nombre, email, rol, categoría, token FCM | El dueño, salvo `rol` y `categoria` |
-| `estacionamientos/{id}` | Datos, niveles y contadores de lugares libres | `ADMIN` o su administrador, salvo contadores y `adminUids` |
-| `estacionamientos/{id}/lugares/{id}` | Código, nivel, tipo y estado de cada lugar | `ADMIN` o su administrador |
-| `estacionamientos/{id}/cupos/{fecha}` | Cupos por categoría para una fecha | `ADMIN` o su administrador |
-| `reservas/{id}` | Reservas | Sólo las functions |
-| `listaEspera/{id}` | Lista de espera | Sólo las functions |
+| `users/{uid}` | Nombre, email, rol, categoría, token FCM | El dueño, salvo `role` y `category` |
+| `parkingLots/{id}` | Estacionamientos: datos, niveles y contadores de lugares libres | `ADMIN` o su administrador, salvo contadores y `adminUids` |
+| `parkingLots/{id}/spots/{id}` | Lugares: código, nivel, tipo y estado de cada lugar | `ADMIN` o su administrador |
+| `parkingLots/{id}/quotas/{fecha}` | Cupos por categoría para una fecha | `ADMIN` o su administrador |
+| `reservations/{id}` | Reservas | Sólo las functions |
+| `waitlist/{id}` | Lista de espera | Sólo las functions |
 
-Estados de un lugar: `LIBRE`, `OCUPADO`, `RESERVADO`, `FUERA_DE_SERVICIO`.
+Estados de un lugar (`status`): `FREE`, `OCCUPIED`, `RESERVED`, `OUT_OF_SERVICE`. Tipos de lugar
+(`type`): `STANDARD`, `PRIORITY`, `MOTORCYCLE`, `EV_CHARGING`.
 
-Los nombres de colecciones y campos están en `data/.../firebase/Colecciones.kt` y se repiten en
+Los nombres de colecciones y campos están en `data/.../firebase/FirestoreNames.kt` y se repiten en
 `firestore.rules` y en `functions/`. Si cambia uno, hay que cambiarlo en los tres a la vez.
 
 ### Reglas
 
 Firestore deniega todo lo que no tenga una regla explícita, así que una colección nueva necesita su
-regla. Todo cambio en `firestore.rules` lleva su caso en `firestore-tests/reglas.test.js`.
+regla. Todo cambio en `firestore.rules` lleva su caso en `firestore-tests/rules.test.js`.
 
 ### Roles
 
 | Rol | Quién es |
 |---|---|
-| `CONDUCTOR` | Usuario final. Es el rol de toda cuenta nueva |
-| `ADMIN_ESTACIONAMIENTO` | Administra los estacionamientos donde figura en `adminUids` |
+| `DRIVER` | Conductor: el usuario final. Es el rol de toda cuenta nueva |
+| `PARKING_ADMIN` | Administrador de estacionamiento: administra los estacionamientos donde figura en `adminUids` |
 | `ADMIN` | Acceso total. Sólo para desarrollo y pruebas |
 
-- El rol viaja como custom claim `rol` en el token del usuario; eso es lo que leen las reglas.
-- Lo asigna siempre el backend: `asignarRolInicial` cuando se crea `usuarios/{uid}`, y después un
-  `ADMIN` puede cambiarlo con la function `asignarRol`.
-- `usuarios/{uid}.rol` es una copia para que la app sepa que tiene que refrescar el token. El
+- El rol viaja como custom claim `role` en el token del usuario; eso es lo que leen las reglas.
+- Lo asigna siempre el backend: `assignInitialRole` cuando se crea `users/{uid}`, y después un
+  `ADMIN` puede cambiarlo con la function `assignRole`.
+- `users/{uid}.role` es una copia para que la app sepa que tiene que refrescar el token. El
   dueño no puede escribirla.
 - Entran como `ADMIN` los emails de `ADMIN_EMAILS`. El valor se lee al desplegar las functions y el
   rol inicial se asigna una sola vez, así que hay que agregar el email y desplegar **antes** de
   registrar la cuenta.
-- Si el registro llega a ofrecer elegir "administrador", ese rol es `ADMIN_ESTACIONAMIENTO`.
+- Si el registro llega a ofrecer elegir "administrador", ese rol es `PARKING_ADMIN`.
   `ADMIN` nunca se elige desde la app.
 
-Para probar con otro rol: registrar una cuenta nueva (entra como `CONDUCTOR`) y cambiársela con
-`asignarRol`. En los emuladores ya hay un usuario por rol.
+Para probar con otro rol: registrar una cuenta nueva (entra como `DRIVER`) y cambiársela con
+`assignRole`. En los emuladores ya hay un usuario por rol.
 
 ### Datos de prueba
 
-`functions/semilla.js` define 3 estacionamientos, con 2 niveles cada uno y 42 lugares en total.
+`functions/seed.js` define 3 estacionamientos, con 2 niveles cada uno y 42 lugares en total.
 Los ids son fijos, así que se puede cargar varias veces sin duplicar; cada carga deja todos los
 lugares libres.
 
-- **Emuladores:** `node functions/scripts/sembrar.js`.
-- **Proyecto real:** la function `cargarSemilla`, que sólo puede llamar un `ADMIN`.
+- **Emuladores:** `node functions/scripts/seed-emulators.js`.
+- **Proyecto real:** la function `loadSeed`, que sólo puede llamar un `ADMIN`.
 
 ### Notificaciones push
 
-Los mensajes son sólo `data`, con `tipo`, `id`, `titulo` y `cuerpo` como strings. La app arma la
-notificación; las de tipo `reserva*` abren `sensorpark://reserva/{id}`.
+Los mensajes son sólo `data`, con `type`, `id`, `title` y `body` como strings. La app arma la
+notificación; las de tipo `reservation*` abren `sensorpark://reservation/{id}`.
 
 ## Git
 

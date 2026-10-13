@@ -9,10 +9,10 @@ import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.sensorpark.domain.model.AuthErrorReason
 import com.sensorpark.domain.model.AuthException
-import com.sensorpark.domain.model.MotivoErrorAuth
-import com.sensorpark.domain.model.Rol
-import com.sensorpark.domain.model.Sesion
+import com.sensorpark.domain.model.Role
+import com.sensorpark.domain.model.Session
 import com.sensorpark.domain.repository.AuthRepository
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.awaitClose
@@ -29,78 +29,79 @@ class AuthRepositoryFirebase @Inject constructor(
     private val db: FirebaseFirestore,
 ) : AuthRepository {
 
-    override val sesion: Flow<Sesion?> = callbackFlow {
+    override val session: Flow<Session?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
-            trySend(firebaseAuth.currentUser?.let { Sesion(it.uid, it.email.orEmpty()) })
+            trySend(firebaseAuth.currentUser?.let { Session(it.uid, it.email.orEmpty()) })
         }
         auth.addAuthStateListener(listener)
         awaitClose { auth.removeAuthStateListener(listener) }
     }
 
-    override suspend fun ingresar(email: String, password: String) = traduciendoErrores {
+    override suspend fun signIn(email: String, password: String) = translatingErrors {
         auth.signInWithEmailAndPassword(email, password).await()
         Unit
     }
 
     /**
      * Crea la cuenta y su documento `users/{uid}`. El rol NO se escribe desde acá:
-     * lo asigna la function `asignarRolInicial` al ver el documento nuevo.
+     * lo asigna la function `assignInitialRole` al ver el documento nuevo.
      */
-    override suspend fun registrar(nombre: String, email: String, password: String) = traduciendoErrores {
+    override suspend fun signUp(name: String, email: String, password: String) = translatingErrors {
         val uid = auth.createUserWithEmailAndPassword(email, password).await().user!!.uid
         // merge: el registro del token FCM puede haber creado el documento antes.
-        db.collection(Colecciones.USUARIOS).document(uid).set(
+        db.collection(Collections.USERS).document(uid).set(
             mapOf(
-                CamposUsuario.NOMBRE to nombre,
-                CamposUsuario.EMAIL to email,
-                CamposUsuario.CREADO_EN to FieldValue.serverTimestamp(),
+                UserFields.NAME to name,
+                UserFields.EMAIL to email,
+                UserFields.CREATED_AT to FieldValue.serverTimestamp(),
             ),
             SetOptions.merge(),
         ).await()
         Unit
     }
 
-    override fun salir() = auth.signOut()
+    override fun signOut() = auth.signOut()
 
     /**
-     * `users/{uid}.rol` es sólo el aviso de que el claim cambió: al verlo se refresca
+     * `users/{uid}.role` es sólo el aviso de que el claim cambió: al verlo se refresca
      * el token y el rol que vale es el del claim, que es el que leen las reglas.
      */
-    override fun rol(uid: String): Flow<Rol?> = callbackFlow {
-        val registro = db.collection(Colecciones.USUARIOS).document(uid)
+    override fun role(uid: String): Flow<Role?> = callbackFlow {
+        val registration = db.collection(Collections.USERS).document(uid)
             .addSnapshotListener { doc, error ->
-                if (error != null) close(error) else trySend(doc?.getString(CamposUsuario.ROL))
+                if (error != null) close(error) else trySend(doc?.getString(UserFields.ROLE))
             }
-        awaitClose { registro.remove() }
-    }.distinctUntilChanged().map { rolEnDocumento ->
-        if (rolEnDocumento == null) null else rolDelToken()
+        awaitClose { registration.remove() }
+    }.distinctUntilChanged().map { roleInDocument ->
+        if (roleInDocument == null) null else roleFromToken()
     }
 
-    private suspend fun rolDelToken(): Rol? {
+    private suspend fun roleFromToken(): Role? {
         val token = auth.currentUser?.getIdToken(true)?.await() ?: return null
-        return Rol.desde(token.claims["rol"])
+        return Role.from(token.claims[ROLE_CLAIM])
     }
 
-    private suspend fun traduciendoErrores(accion: suspend () -> Unit) {
+    private suspend fun translatingErrors(action: suspend () -> Unit) {
         try {
             // await() espera el ack del servidor: sin tope, una red rota cuelga la UI.
-            withTimeout(TOPE_MS) { accion() }
+            withTimeout(TIMEOUT_MS) { action() }
         } catch (e: TimeoutCancellationException) {
-            throw AuthException(MotivoErrorAuth.SIN_CONEXION, e)
+            throw AuthException(AuthErrorReason.NO_CONNECTION, e)
         } catch (e: FirebaseNetworkException) {
-            throw AuthException(MotivoErrorAuth.SIN_CONEXION, e)
+            throw AuthException(AuthErrorReason.NO_CONNECTION, e)
         } catch (e: FirebaseAuthWeakPasswordException) {
-            throw AuthException(MotivoErrorAuth.PASSWORD_DEBIL, e)
+            throw AuthException(AuthErrorReason.WEAK_PASSWORD, e)
         } catch (e: FirebaseAuthUserCollisionException) {
-            throw AuthException(MotivoErrorAuth.EMAIL_EN_USO, e)
+            throw AuthException(AuthErrorReason.EMAIL_IN_USE, e)
         } catch (e: FirebaseAuthInvalidUserException) {
-            throw AuthException(MotivoErrorAuth.CREDENCIALES_INVALIDAS, e)
+            throw AuthException(AuthErrorReason.INVALID_CREDENTIALS, e)
         } catch (e: FirebaseAuthInvalidCredentialsException) {
-            throw AuthException(MotivoErrorAuth.CREDENCIALES_INVALIDAS, e)
+            throw AuthException(AuthErrorReason.INVALID_CREDENTIALS, e)
         }
     }
 
     private companion object {
-        const val TOPE_MS = 15_000L
+        const val TIMEOUT_MS = 15_000L
+        const val ROLE_CLAIM = "role"
     }
 }

@@ -7,57 +7,61 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function autenticado() { return request.auth != null; }
-    function esDuenio(uid) { return autenticado() && request.auth.uid == uid; }
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
 
     // El rol es un custom claim que sólo asigna el backend (functions/index.js).
-    function tieneRol(rol) { return autenticado() && request.auth.token.get('rol', '') == rol; }
-    function esAdmin() { return tieneRol('ADMIN'); }
+    function hasRole(role) { return isSignedIn() && request.auth.token.get('role', '') == role; }
+    function isAdmin() { return hasRole('ADMIN'); }
 
     // get() porque se evalúa también desde subcolecciones y desde reservas, donde `resource` es otro documento.
-    function administra(eid) {
-      return tieneRol('ADMIN_ESTACIONAMIENTO') &&
-        request.auth.uid in get(/databases/$(database)/documents/estacionamientos/$(eid)).data.adminUids;
+    function managesParkingLot(lotId) {
+      return hasRole('PARKING_ADMIN') &&
+        request.auth.uid in get(/databases/$(database)/documents/parkingLots/$(lotId)).data.adminUids;
     }
 
-    function cambia(campos) {
-      return request.resource.data.diff(resource.data).affectedKeys().hasAny(campos);
+    function changes(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
     }
 
     // Perfil, token FCM y preferencias. El dueño nunca puede escribir su rol ni su categoría de prioridad.
-    match /usuarios/{uid} {
-      allow read: if esDuenio(uid) || esAdmin();
-      allow create: if esDuenio(uid) && !request.resource.data.keys().hasAny(['rol', 'categoria']);
-      allow update: if esDuenio(uid) && !cambia(['rol', 'categoria']);
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && !request.resource.data.keys().hasAny(['role', 'category']);
+      allow update: if isOwner(uid) && !changes(['role', 'category']);
     }
 
-    match /estacionamientos/{eid} {
-      allow read: if autenticado();
-      allow create, delete: if esAdmin();
+    // Estacionamientos.
+    match /parkingLots/{lotId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
       // Su administrador edita los datos, pero no los contadores ni quién lo administra.
-      allow update: if esAdmin() ||
-        (administra(eid) && !cambia(['adminUids', 'capacidad', 'libres', 'libresPorTipo']));
+      allow update: if isAdmin() ||
+        (managesParkingLot(lotId) && !changes(['adminUids', 'capacity', 'freeSpots', 'freeSpotsByType']));
 
-      match /lugares/{lid} {
-        allow read: if autenticado();
-        allow write: if esAdmin() || administra(eid);
+      // Lugares del estacionamiento.
+      match /spots/{spotId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin() || managesParkingLot(lotId);
       }
 
-      // Cupos por prioridad de una fecha (id del documento: AAAA-MM-DD).
-      match /cupos/{fecha} {
-        allow read: if autenticado();
-        allow write: if esAdmin() || administra(eid);
+      // Cupos por categoría de prioridad de una fecha (id del documento: AAAA-MM-DD).
+      match /quotas/{date} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin() || managesParkingLot(lotId);
       }
     }
 
-    match /reservas/{rid} {
-      allow read: if esAdmin() ||
-        (autenticado() && resource.data.usuarioId == request.auth.uid) ||
-        administra(resource.data.estacionamientoId);
+    // Reservas.
+    match /reservations/{reservationId} {
+      allow read: if isAdmin() ||
+        (isSignedIn() && resource.data.userId == request.auth.uid) ||
+        managesParkingLot(resource.data.parkingLotId);
     }
 
-    match /listaEspera/{id} {
-      allow read: if esAdmin() || (autenticado() && resource.data.usuarioId == request.auth.uid);
+    // Lista de espera.
+    match /waitlist/{entryId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
   }
 }
