@@ -21,6 +21,9 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 firebase emulators:exec --only firestore --project demo-sensorpark "npm --prefix firestore-tests test"
 
+# Emuladores con datos de prueba (en otra terminal: node functions/scripts/sembrar.js)
+firebase emulators:start
+
 # Backend: nada de esto viaja en el APK
 firebase deploy --only firestore:rules,firestore:indexes
 firebase deploy --only functions
@@ -52,6 +55,26 @@ Para sumar un repositorio: interfaz en `domain/repository`, implementación en `
 - Firebase BoM 34: no existen los artefactos `-ktx`.
 - Hilt con KSP, no kapt.
 - Sin flavors: se descartaron a propósito.
+
+## Backend y tareas
+
+El backend es sólo Firebase: la app lee Firestore directo (en tiempo real, con listeners) y lo que
+tiene reglas de negocio va en Cloud Functions invocables. No hay servidor propio, API REST ni
+WebSocket; Retrofit y OkHttp quedaron en el catálogo sin uso. Room se usa únicamente donde hace
+falta estado propio del teléfono (favoritos, geocercas).
+
+Las tareas están en Jira, proyecto `KAN` de `frba-team-wathitdw.atlassian.net`, y ya describen
+esta arquitectura.
+
+**Modelo de datos.** Las colecciones son `usuarios`, `estacionamientos` (con subcolecciones
+`lugares` y `cupos`), `reservas` y `listaEspera`. Estados de lugar: `LIBRE`, `OCUPADO`,
+`RESERVADO`, `FUERA_DE_SERVICIO`. La app no escribe reservas ni lista de espera: sólo las
+functions. El contrato formal (KAN-4) todavía no se cerró; si cambia un nombre hay que tocarlo en
+`firestore.rules`, `functions/` y `data/.../firebase/Colecciones.kt` a la vez.
+
+**Semilla.** `functions/semilla.js` tiene 3 estacionamientos, 2 niveles cada uno y 42 lugares, con
+ids fijos. En el proyecto real la carga la function `cargarSemilla` (sólo `ADMIN`); en los
+emuladores, `node functions/scripts/sembrar.js`, que además crea un usuario por rol.
 
 ## Firebase
 
