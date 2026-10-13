@@ -1,52 +1,80 @@
 # SensorPark
 
-App Android (UTN FRBA, Desarrollo de Apps Móviles) que muestra en tiempo real qué cocheras están
-libres, permite reservarlas y avisa por push. Los sensores se simulan con una Cloud Function.
-El README tiene la puesta en marcha para el equipo; esto es lo que hace falta para trabajar en el código.
+App Android (UTN FRBA, Desarrollo de Apps Móviles) que muestra en tiempo real qué lugares están
+libres en estacionamientos, permite reservarlos y avisa por push. Los sensores se simulan con una
+Cloud Function.
+
+Este archivo resume cómo está armado el proyecto y qué hay que saber para tocar el código. La
+puesta en marcha paso a paso (clonar, `google-services.json`, key de Maps) está en el README.
 
 Código, comentarios, commits y nombres de dominio van en español.
 
 ## Comandos
 
-En Windows el `java` del PATH es Java 8: Gradle y el emulador de Firestore necesitan el JBR de
-Android Studio.
+Gradle y los emuladores de Firebase necesitan Java 21 o superior. Si el `java` de tu PATH es más
+viejo, alcanza con apuntar `JAVA_HOME` al JBR que trae Android Studio:
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+```
 
+App:
+
+```powershell
 .\gradlew.bat :app:assembleDebug        # compila todos los módulos
 .\gradlew.bat :domain:test              # tests JVM de domain
+```
 
-# Tests de firestore.rules (la primera vez: npm install dentro de firestore-tests)
-$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+Backend (requiere la Firebase CLI, con `firebase login` hecho):
+
+```powershell
+# Tests de las reglas de Firestore. La primera vez: npm install dentro de firestore-tests
 firebase emulators:exec --only firestore --project demo-sensorpark "npm --prefix firestore-tests test"
 
-# Emuladores con datos de prueba (en otra terminal: node functions/scripts/sembrar.js)
+# Emuladores locales, para probar sin tocar la base real
 firebase emulators:start
+node functions/scripts/sembrar.js       # en otra terminal: carga datos y usuarios de prueba
 
-# Backend: nada de esto viaja en el APK
+# Despliegue: reglas, índices y functions no viajan en el APK
 firebase deploy --only firestore:rules,firestore:indexes
 firebase deploy --only functions
 ```
 
-Sin `app/google-services.json` el build falla. Está gitignoreado, igual que `local.properties`
-(`MAPS_API_KEY`) y `functions/.env` (`ADMIN_EMAILS`). No commitear ninguno ni imprimir sus valores.
+### Archivos que no están en el repo
+
+Los tres están en el `.gitignore`. No hay que commitearlos ni pegar su contenido en ningún lado.
+
+| Archivo | Para qué | Si falta |
+|---|---|---|
+| `app/google-services.json` | Conecta la app con el proyecto de Firebase | El build falla |
+| `local.properties` (`MAPS_API_KEY`) | Key de Google Maps, una por integrante | Compila, pero el mapa sale gris |
+| `functions/.env` (`ADMIN_EMAILS`) | Emails que entran como `ADMIN` | Sólo hace falta para desplegar functions |
 
 ## Módulos
 
-- `app`: Activity única, navegación (`navegacion/Ruta.kt`, `NavegacionApp.kt`), login, inicio,
-  preferencias y la pantalla de diagnóstico.
-- `domain`: Kotlin puro. Modelos, interfaces de repositorios, casos de uso. Sin Android ni Firebase.
-- `data`: implementaciones con Firebase, módulos de Hilt, servicio de FCM y notificaciones.
-- `core/ui`: tema y componentes comunes; expone Compose y Material 3 con `api`.
-- `feature/{mapa,estacionamiento,reservas,checkin,admin}`: una funcionalidad cada uno.
+| Módulo | Qué contiene |
+|---|---|
+| `app` | Activity única, navegación (`navegacion/Ruta.kt`, `NavegacionApp.kt`), login, inicio, preferencias y la pantalla de diagnóstico |
+| `domain` | Kotlin puro: modelos, interfaces de repositorios y casos de uso. Sin Android ni Firebase |
+| `data` | Implementaciones con Firebase, módulos de Hilt, servicio de FCM y notificaciones |
+| `core/ui` | Tema y componentes comunes; expone Compose y Material 3 con `api` |
+| `feature/{mapa,estacionamiento,reservas,checkin,admin}` | Una funcionalidad cada uno |
 
-Dependencias permitidas: los `feature` usan `domain` y `core/ui`, nunca `data` ni otro `feature`.
-`data` implementa `domain`. Sólo `app` conoce a todos. Las pantallas reciben lambdas para navegar;
-las rutas viven únicamente en `app`.
+Quién puede depender de quién:
 
-Para sumar un repositorio: interfaz en `domain/repository`, implementación en `data` y `@Binds` en
-`data/.../di/RepositoriosModule.kt`. Las versiones van siempre en `gradle/libs.versions.toml`.
+- Los `feature` usan `domain` y `core/ui`. Nunca `data` ni otro `feature`.
+- `data` implementa las interfaces de `domain`.
+- Sólo `app` conoce a todos y los une.
+
+Cómo se agrega algo:
+
+- **Una pantalla:** el composable va en su `feature` y recibe lambdas para navegar. La ruta se
+  declara en `app/.../navegacion/Ruta.kt` y se conecta en `NavegacionApp.kt`.
+- **Un repositorio:** interfaz en `domain/repository`, implementación en `data` y `@Binds` en
+  `data/.../di/RepositoriosModule.kt`.
+- **Una dependencia:** siempre en `gradle/libs.versions.toml`, nunca con la versión escrita en un
+  `build.gradle.kts`.
 
 ## Toolchain
 
@@ -54,64 +82,78 @@ Para sumar un repositorio: interfaz en `domain/repository`, implementación en `
   `kotlin.jvm`.
 - Firebase BoM 34: no existen los artefactos `-ktx`.
 - Hilt con KSP, no kapt.
-- Sin flavors: se descartaron a propósito.
+- Sin flavors.
 
-## Backend y tareas
+## Backend
 
-El backend es sólo Firebase: la app lee Firestore directo (en tiempo real, con listeners) y lo que
-tiene reglas de negocio va en Cloud Functions invocables. No hay servidor propio, API REST ni
-WebSocket; Retrofit y OkHttp quedaron en el catálogo sin uso. Room se usa únicamente donde hace
-falta estado propio del teléfono (favoritos, geocercas).
+El backend es sólo Firebase; no hay servidor propio, API REST ni WebSocket.
 
-Las tareas están en Jira, proyecto `KAN` de `frba-team-wathitdw.atlassian.net`, y ya describen
-esta arquitectura.
+- **Leer:** la app lee Firestore directo, con listeners, y así recibe los cambios en tiempo real.
+- **Escribir con reglas de negocio** (reservar, cancelar, cambiar roles): Cloud Functions
+  invocables, en `functions/index.js`.
+- **Estado propio del teléfono** (favoritos, geocercas): Room.
 
-**Modelo de datos.** Las colecciones son `usuarios`, `estacionamientos` (con subcolecciones
-`lugares` y `cupos`), `reservas` y `listaEspera`. Estados de lugar: `LIBRE`, `OCUPADO`,
-`RESERVADO`, `FUERA_DE_SERVICIO`. La app no escribe reservas ni lista de espera: sólo las
-functions. El contrato formal (KAN-4) todavía no se cerró; si cambia un nombre hay que tocarlo en
-`firestore.rules`, `functions/` y `data/.../firebase/Colecciones.kt` a la vez.
+Firestore y las functions están en `southamerica-east1`. La región está escrita en
+`functions/index.js` y en `data/.../di/FirebaseModule.kt`; tienen que coincidir.
 
-**Semilla.** `functions/semilla.js` tiene 3 estacionamientos, 2 niveles cada uno y 42 lugares, con
-ids fijos. En el proyecto real la carga la function `cargarSemilla` (sólo `ADMIN`); en los
-emuladores, `node functions/scripts/sembrar.js`, que además crea un usuario por rol.
+### Modelo de datos
 
-## Firebase
+| Colección | Qué guarda | Quién escribe |
+|---|---|---|
+| `usuarios/{uid}` | Nombre, email, rol, categoría, token FCM | El dueño, salvo `rol` y `categoria` |
+| `estacionamientos/{id}` | Datos, niveles y contadores de lugares libres | `ADMIN` o su administrador, salvo contadores y `adminUids` |
+| `estacionamientos/{id}/lugares/{id}` | Código, nivel, tipo y estado de cada lugar | `ADMIN` o su administrador |
+| `estacionamientos/{id}/cupos/{fecha}` | Cupos por categoría para una fecha | `ADMIN` o su administrador |
+| `reservas/{id}` | Reservas | Sólo las functions |
+| `listaEspera/{id}` | Lista de espera | Sólo las functions |
 
-Proyecto `sensorpark-3f8aa`, Firestore `(default)` y functions en `southamerica-east1`. La región
-está escrita en `functions/index.js` (`setGlobalOptions`) y en `data/.../di/FirebaseModule.kt`;
-tienen que coincidir.
+Estados de un lugar: `LIBRE`, `OCUPADO`, `RESERVADO`, `FUERA_DE_SERVICIO`.
 
-- **Roles** (`CONDUCTOR`, `ADMIN_ESTACIONAMIENTO`, `ADMIN`): custom claim `rol`, que es lo que leen
-  las reglas. Lo asigna `asignarRolInicial` cuando se crea `usuarios/{uid}`; los emails de
-  `ADMIN_EMAILS` entran como `ADMIN`. `users/{uid}.rol` es sólo el aviso para que la app refresque
-  el token, y el dueño no puede escribirlo.
-- **Para que una cuenta sea `ADMIN`** hay que tocar `ADMIN_EMAILS` en `functions/.env` (emails
-  separados por coma) y correr `firebase deploy --only functions` **antes** de registrarla. El valor
-  se lee al desplegar, y el rol se asigna una sola vez: una cuenta que ya se registró no cambia
-  aunque después se agregue su email. Para corregirla hay que borrarla (Authentication y su
-  documento en `usuarios`) y registrarla de nuevo, o cambiarle el rol con `asignarRol`.
-- **Pendiente de decidir: elegir el rol al crear la cuenta.** Hoy el registro no pregunta nada y
-  todos entran como `CONDUCTOR`. Si se quiere sumar un paso para elegir entre conductor y
-  administrador, ese "administrador" es el de un garage (`ADMIN_ESTACIONAMIENTO`), no el del
-  sistema (`ADMIN`). El rol lo tiene que seguir asignando el backend: la app mandaría el rol
-  pedido y `asignarRolInicial` aceptaría sólo `CONDUCTOR` o `ADMIN_ESTACIONAMIENTO`. `ADMIN` nunca
-  se puede elegir desde la app; sigue saliendo únicamente de `ADMIN_EMAILS`.
-- **Pushes**: sólo `data`, con `tipo`, `id`, `titulo` y `cuerpo` como strings. La app arma la
-  notificación; las de tipo `reserva*` abren `sensorpark://reserva/{id}`.
-- **Reglas**: todo cambio en `firestore.rules` lleva su caso en `firestore-tests/reglas.test.js`.
-  Colección nueva = regla nueva (Firestore deniega por defecto).
-- Los nombres de colecciones y campos están en `data/.../firebase/Colecciones.kt` y se repiten en
-  las reglas y en las functions.
+Los nombres de colecciones y campos están en `data/.../firebase/Colecciones.kt` y se repiten en
+`firestore.rules` y en `functions/`. Si cambia uno, hay que cambiarlo en los tres a la vez.
 
-### Cuenta de prueba
+### Reglas
 
-Hay una cuenta compartida del equipo con rol `ADMIN` para probar la app contra el proyecto real.
-Las credenciales no están en el repo, que es público: se piden por el grupo del equipo.
+Firestore deniega todo lo que no tenga una regla explícita, así que una colección nueva necesita su
+regla. Todo cambio en `firestore.rules` lleva su caso en `firestore-tests/reglas.test.js`.
 
-Es sólo para pruebas: no guardar ahí datos reales. Para probar los otros roles, registrar una cuenta
-nueva (entra como `CONDUCTOR`) y cambiarle el rol con la function `asignarRol`.
+### Roles
+
+| Rol | Quién es |
+|---|---|
+| `CONDUCTOR` | Usuario final. Es el rol de toda cuenta nueva |
+| `ADMIN_ESTACIONAMIENTO` | Administra los estacionamientos donde figura en `adminUids` |
+| `ADMIN` | Acceso total. Sólo para desarrollo y pruebas |
+
+- El rol viaja como custom claim `rol` en el token del usuario; eso es lo que leen las reglas.
+- Lo asigna siempre el backend: `asignarRolInicial` cuando se crea `usuarios/{uid}`, y después un
+  `ADMIN` puede cambiarlo con la function `asignarRol`.
+- `usuarios/{uid}.rol` es una copia para que la app sepa que tiene que refrescar el token. El
+  dueño no puede escribirla.
+- Entran como `ADMIN` los emails de `ADMIN_EMAILS`. El valor se lee al desplegar las functions y el
+  rol inicial se asigna una sola vez, así que hay que agregar el email y desplegar **antes** de
+  registrar la cuenta.
+- Si el registro llega a ofrecer elegir "administrador", ese rol es `ADMIN_ESTACIONAMIENTO`.
+  `ADMIN` nunca se elige desde la app.
+
+Para probar con otro rol: registrar una cuenta nueva (entra como `CONDUCTOR`) y cambiársela con
+`asignarRol`. En los emuladores ya hay un usuario por rol.
+
+### Datos de prueba
+
+`functions/semilla.js` define 3 estacionamientos, con 2 niveles cada uno y 42 lugares en total.
+Los ids son fijos, así que se puede cargar varias veces sin duplicar; cada carga deja todos los
+lugares libres.
+
+- **Emuladores:** `node functions/scripts/sembrar.js`.
+- **Proyecto real:** la function `cargarSemilla`, que sólo puede llamar un `ADMIN`.
+
+### Notificaciones push
+
+Los mensajes son sólo `data`, con `tipo`, `id`, `titulo` y `cuerpo` como strings. La app arma la
+notificación; las de tipo `reserva*` abren `sensorpark://reserva/{id}`.
 
 ## Git
 
-`main` es el entregable. Cada tarea va en su rama y entra por Pull Request. No hay `gh` instalado.
+`main` es el entregable y siempre tiene que compilar. Cada tarea va en su rama y entra por Pull
+Request; nada se sube directo a `main`.
