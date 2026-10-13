@@ -8,7 +8,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
-const { sembrar } = require("./semilla");
+const { seed } = require("./seed");
 
 // Tiene que ser la misma región que se eligió al crear la base de Firestore.
 setGlobalOptions({ region: "southamerica-east1", maxInstances: 5 });
@@ -16,133 +16,135 @@ setGlobalOptions({ region: "southamerica-east1", maxInstances: 5 });
 initializeApp();
 const db = getFirestore();
 
-const ROLES = ["CONDUCTOR", "ADMIN_ESTACIONAMIENTO", "ADMIN"];
-const CATEGORIA_INICIAL = "COMUN";
+// DRIVER: usuario final. PARKING_ADMIN: administra los estacionamientos donde figura en
+// `adminUids`. ADMIN: acceso total, sólo para desarrollo y pruebas.
+const ROLES = ["DRIVER", "PARKING_ADMIN", "ADMIN"];
+const INITIAL_CATEGORY = "STANDARD";
 const ADMIN_EMAILS = defineString("ADMIN_EMAILS", { default: "" });
 
-function exigirAdmin(request) {
-  if (!request.auth || request.auth.token.rol !== "ADMIN") {
+function requireAdmin(request) {
+  if (!request.auth || request.auth.token.role !== "ADMIN") {
     throw new HttpsError("permission-denied", "Sólo un administrador puede hacer esto.");
   }
 }
 
-// El claim es la fuente de verdad (lo leen las reglas). `usuarios/{uid}.rol` es el aviso
+// El claim es la fuente de verdad (lo leen las reglas). `users/{uid}.role` es el aviso
 // para que la app refresque el token; el dueño no puede escribir ese campo.
-async function fijarRol(uid, rol) {
-  await getAuth().setCustomUserClaims(uid, { rol });
-  await db.doc(`usuarios/${uid}`).set({ rol }, { merge: true });
+async function setRole(uid, role) {
+  await getAuth().setCustomUserClaims(uid, { role });
+  await db.doc(`users/${uid}`).set({ role }, { merge: true });
 }
 
-// Todo usuario nuevo entra como CONDUCTOR y con categoría COMUN, salvo los emails de
+// Todo usuario nuevo entra como DRIVER y con categoría STANDARD, salvo los emails de
 // ADMIN_EMAILS, que entran como ADMIN.
-exports.asignarRolInicial = onDocumentCreated("usuarios/{uid}", async (event) => {
+exports.assignInitialRole = onDocumentCreated("users/{uid}", async (event) => {
   const uid = event.params.uid;
-  const usuario = await getAuth().getUser(uid);
-  const rolActual = usuario.customClaims && usuario.customClaims.rol;
+  const user = await getAuth().getUser(uid);
+  const currentRole = user.customClaims && user.customClaims.role;
 
-  if (rolActual) {
+  if (currentRole) {
     // La cuenta ya tenía rol y su documento se volvió a crear: sólo se repone el aviso.
-    await event.data.ref.set({ rol: rolActual, categoria: CATEGORIA_INICIAL }, { merge: true });
+    await event.data.ref.set({ role: currentRole, category: INITIAL_CATEGORY }, { merge: true });
     return;
   }
 
   const admins = ADMIN_EMAILS.value().split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
-  const rol = admins.includes((usuario.email || "").toLowerCase()) ? "ADMIN" : "CONDUCTOR";
-  await event.data.ref.set({ categoria: CATEGORIA_INICIAL }, { merge: true });
-  await fijarRol(uid, rol);
-  logger.info("Rol inicial asignado", { uid, rol });
+  const role = admins.includes((user.email || "").toLowerCase()) ? "ADMIN" : "DRIVER";
+  await event.data.ref.set({ category: INITIAL_CATEGORY }, { merge: true });
+  await setRole(uid, role);
+  logger.info("Rol inicial asignado", { uid, role });
 });
 
-// Un ADMIN cambia el rol de otro usuario. Datos: { uid, rol }.
-exports.asignarRol = onCall(async (request) => {
-  exigirAdmin(request);
-  const { uid, rol } = request.data || {};
-  if (typeof uid !== "string" || !ROLES.includes(rol)) {
-    throw new HttpsError("invalid-argument", "Se espera { uid, rol } con un rol válido.");
+// Un ADMIN cambia el rol de otro usuario. Datos: { uid, role }.
+exports.assignRole = onCall(async (request) => {
+  requireAdmin(request);
+  const { uid, role } = request.data || {};
+  if (typeof uid !== "string" || !ROLES.includes(role)) {
+    throw new HttpsError("invalid-argument", "Se espera { uid, role } con un rol válido.");
   }
-  await fijarRol(uid, rol);
-  return { uid, rol };
+  await setRole(uid, role);
+  return { uid, role };
 });
 
-// Un ADMIN carga (o restablece) los datos semilla en la base. Ver semilla.js.
-exports.cargarSemilla = onCall(async (request) => {
-  exigirAdmin(request);
-  const resultado = await sembrar(db);
-  logger.info("Semilla cargada", resultado);
-  return resultado;
+// Un ADMIN carga (o restablece) los datos semilla en la base. Ver seed.js.
+exports.loadSeed = onCall(async (request) => {
+  requireAdmin(request);
+  const result = await seed(db);
+  logger.info("Semilla cargada", result);
+  return result;
 });
 
 // Envía una push sólo `data` (todos strings) a los usuarios indicados y limpia tokens vencidos.
-async function enviarPush(uids, data) {
-  const docs = await Promise.all(uids.map((uid) => db.doc(`usuarios/${uid}`).get()));
-  const destinos = docs.filter((d) => d.exists && d.get("fcmToken"));
-  if (destinos.length === 0) return 0;
+async function sendPush(uids, data) {
+  const docs = await Promise.all(uids.map((uid) => db.doc(`users/${uid}`).get()));
+  const recipients = docs.filter((d) => d.exists && d.get("fcmToken"));
+  if (recipients.length === 0) return 0;
 
-  const respuesta = await getMessaging().sendEachForMulticast({
-    tokens: destinos.map((d) => d.get("fcmToken")),
+  const response = await getMessaging().sendEachForMulticast({
+    tokens: recipients.map((d) => d.get("fcmToken")),
     data,
     // priority high para que Doze no la retenga; ttl explícito para que no llegue horas tarde.
     android: { priority: "high", ttl: 10 * 60 * 1000 },
   });
 
-  const vencidos = ["messaging/registration-token-not-registered", "messaging/invalid-registration-token"];
-  await Promise.all(respuesta.responses.map((r, i) =>
-    !r.success && vencidos.includes(r.error.code)
-      ? destinos[i].ref.update({ fcmToken: FieldValue.delete() })
+  const expired = ["messaging/registration-token-not-registered", "messaging/invalid-registration-token"];
+  await Promise.all(response.responses.map((r, i) =>
+    !r.success && expired.includes(r.error.code)
+      ? recipients[i].ref.update({ fcmToken: FieldValue.delete() })
       : null));
-  return respuesta.successCount;
+  return response.successCount;
 }
 
 // Ejemplo del circuito de avisos: confirma al conductor que su reserva quedó registrada.
-exports.avisarReservaCreada = onDocumentCreated("reservas/{reservaId}", async (event) => {
-  const reserva = event.data.data();
-  if (!reserva.usuarioId) return;
-  await enviarPush([reserva.usuarioId], {
-    tipo: "reserva_creada",
-    id: event.params.reservaId,
-    titulo: "Reserva confirmada",
-    cuerpo: "Tu lugar quedó reservado.",
+exports.notifyReservationCreated = onDocumentCreated("reservations/{reservationId}", async (event) => {
+  const reservation = event.data.data();
+  if (!reservation.userId) return;
+  await sendPush([reservation.userId], {
+    type: "reservation_created",
+    id: event.params.reservationId,
+    title: "Reserva confirmada",
+    body: "Tu lugar quedó reservado.",
   });
 });
 
 // La usa la pantalla de diagnóstico de la app: manda una push al propio usuario para
 // verificar de punta a punta Functions + FCM.
-exports.pushDePrueba = onCall(async (request) => {
+exports.sendTestPush = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión.");
-  const enviadas = await enviarPush([request.auth.uid], {
-    tipo: "prueba",
+  const sent = await sendPush([request.auth.uid], {
+    type: "test",
     id: String(Date.now()),
-    titulo: "Push de prueba",
-    cuerpo: "Functions y FCM están funcionando.",
+    title: "Push de prueba",
+    body: "Functions y FCM están funcionando.",
   });
-  if (enviadas === 0) {
+  if (sent === 0) {
     throw new HttpsError("failed-precondition", "No hay un token FCM válido registrado para este usuario.");
   }
-  return { enviadas };
+  return { sent };
 });
 
-// Simulador de sensores mínimo: cada corrida cambia algunos lugares entre LIBRE y OCUPADO.
-// Los RESERVADO y FUERA_DE_SERVICIO no se tocan. Todavía no actualiza los contadores de
-// libres del estacionamiento. Se pausa desde Cloud Scheduler en la consola de Google Cloud.
-const LUGARES_POR_CORRIDA = 50;
-const PROBABILIDAD_DE_CAMBIO = 0.2;
+// Simulador de sensores mínimo: cada corrida cambia algunos lugares entre FREE y OCCUPIED.
+// Los RESERVED y OUT_OF_SERVICE no se tocan. Todavía no actualiza los contadores de
+// lugares libres del estacionamiento. Se pausa desde Cloud Scheduler en la consola de Google Cloud.
+const SPOTS_PER_RUN = 50;
+const CHANGE_PROBABILITY = 0.2;
 
-exports.simularSensores = onSchedule("every 5 minutes", async () => {
-  const lugares = await db.collectionGroup("lugares").limit(LUGARES_POR_CORRIDA).get();
-  const lote = db.batch();
-  let cambios = 0;
+exports.simulateSensors = onSchedule("every 5 minutes", async () => {
+  const spots = await db.collectionGroup("spots").limit(SPOTS_PER_RUN).get();
+  const batch = db.batch();
+  let changes = 0;
 
-  lugares.forEach((lugar) => {
-    const estado = lugar.get("estado");
-    const loMueveElSensor = estado === "LIBRE" || estado === "OCUPADO";
-    if (!loMueveElSensor || Math.random() > PROBABILIDAD_DE_CAMBIO) return;
-    lote.update(lugar.ref, {
-      estado: estado === "OCUPADO" ? "LIBRE" : "OCUPADO",
-      actualizadoEn: FieldValue.serverTimestamp(),
+  spots.forEach((spot) => {
+    const status = spot.get("status");
+    const movedBySensor = status === "FREE" || status === "OCCUPIED";
+    if (!movedBySensor || Math.random() > CHANGE_PROBABILITY) return;
+    batch.update(spot.ref, {
+      status: status === "OCCUPIED" ? "FREE" : "OCCUPIED",
+      updatedAt: FieldValue.serverTimestamp(),
     });
-    cambios++;
+    changes++;
   });
 
-  if (cambios > 0) await lote.commit();
-  logger.info("Simulación de sensores", { revisados: lugares.size, cambios });
+  if (changes > 0) await batch.commit();
+  logger.info("Simulación de sensores", { checked: spots.size, changes });
 });

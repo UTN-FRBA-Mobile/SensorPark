@@ -1,19 +1,19 @@
 {
   "indexes": [
     {
-      "collectionGroup": "reservas",
+      "collectionGroup": "reservations",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "usuarioId", "order": "ASCENDING" },
-        { "fieldPath": "inicio", "order": "DESCENDING" }
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "startsAt", "order": "DESCENDING" }
       ]
     },
     {
-      "collectionGroup": "reservas",
+      "collectionGroup": "reservations",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "estado", "order": "ASCENDING" },
-        { "fieldPath": "toleranciaHasta", "order": "ASCENDING" }
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "toleranceUntil", "order": "ASCENDING" }
       ]
     }
   ],
