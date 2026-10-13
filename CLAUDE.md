@@ -83,14 +83,14 @@ está escrita en `functions/index.js` (`setGlobalOptions`) y en `data/.../di/Fir
 tienen que coincidir.
 
 - **Roles** (`CONDUCTOR`, `ADMIN_ESTACIONAMIENTO`, `ADMIN`): custom claim `rol`, que es lo que leen
-  las reglas. Lo asigna `asignarRolInicial` cuando se crea `users/{uid}`; los emails de
+  las reglas. Lo asigna `asignarRolInicial` cuando se crea `usuarios/{uid}`; los emails de
   `ADMIN_EMAILS` entran como `ADMIN`. `users/{uid}.rol` es sólo el aviso para que la app refresque
   el token, y el dueño no puede escribirlo.
 - **Para que una cuenta sea `ADMIN`** hay que tocar `ADMIN_EMAILS` en `functions/.env` (emails
   separados por coma) y correr `firebase deploy --only functions` **antes** de registrarla. El valor
   se lee al desplegar, y el rol se asigna una sola vez: una cuenta que ya se registró no cambia
   aunque después se agregue su email. Para corregirla hay que borrarla (Authentication y su
-  documento en `users`) y registrarla de nuevo, o cambiarle el rol con `asignarRol`.
+  documento en `usuarios`) y registrarla de nuevo, o cambiarle el rol con `asignarRol`.
 - **Pendiente de decidir: elegir el rol al crear la cuenta.** Hoy el registro no pregunta nada y
   todos entran como `CONDUCTOR`. Si se quiere sumar un paso para elegir entre conductor y
   administrador, ese "administrador" es el de un garage (`ADMIN_ESTACIONAMIENTO`), no el del
