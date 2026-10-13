@@ -53,9 +53,9 @@ clave se sube al repositorio.
 | `domain` | Modelos, interfaces de repositorios y casos de uso. Kotlin puro: sin Android ni Firebase |
 | `data` | Implementación de los repositorios, Firebase, notificaciones. Acá van también Room, Retrofit, DataStore y WorkManager |
 | `core/ui` | Tema y componentes comunes de Compose |
-| `feature/mapa` | Mapa de estacionamientos |
-| `feature/estacionamiento` | Detalle de un estacionamiento |
-| `feature/reservas` | Reservar y mis reservas |
+| `feature/map` | Mapa de estacionamientos |
+| `feature/parking` | Detalle de un estacionamiento |
+| `feature/reservations` | Reservar y mis reservas |
 | `feature/checkin` | Check-in |
 | `feature/admin` | Administración |
 
@@ -65,20 +65,23 @@ Reglas de dependencia: los `feature` dependen de `domain` y `core/ui`, nunca ent
 ### Cómo se agrega algo
 
 - **Una pantalla:** el composable va en su `feature` y recibe lambdas para navegar (no conoce las
-  rutas). La ruta se declara en `app/.../navegacion/Ruta.kt` y se conecta en `NavegacionApp.kt`.
+  rutas). La ruta se declara en `app/.../navigation/Route.kt` y se conecta en `AppNavigation.kt`.
 - **Un repositorio:** la interfaz en `domain/repository`, la implementación en `data` y el `@Binds`
-  en `data/.../di/RepositoriosModule.kt`. Los ViewModels (`@HiltViewModel`) piden la interfaz.
+  en `data/.../di/RepositoriesModule.kt`. Los ViewModels (`@HiltViewModel`) piden la interfaz.
 - **Una dependencia:** siempre por el catálogo `gradle/libs.versions.toml`, nunca con la versión
   escrita en un `build.gradle.kts`.
 
-Deep link disponible: `sensorpark://reserva/{id}` abre *Mis reservas* en esa reserva. Para probarlo:
+Deep link disponible: `sensorpark://reservation/{id}` abre *Mis reservas* en esa reserva. Para probarlo:
 
 ```
-adb shell am start -a android.intent.action.VIEW -d "sensorpark://reserva/123" com.sensorpark.app
+adb shell am start -a android.intent.action.VIEW -d "sensorpark://reservation/123" com.sensorpark.app
 ```
 
-## Ramas
+## Convenciones
 
+- **El código va en inglés:** módulos, paquetes, clases, funciones, colecciones y campos de
+  Firestore, y nombres de Cloud Functions.
+- **Van en español:** los comentarios, los commits, la documentación y los textos que ve el usuario.
 - `main` es el entregable: siempre compila.
 - Cada tarea se hace en una rama propia que sale de `main` y vuelve por Pull Request.
 
@@ -97,18 +100,18 @@ firebase deploy --only firestore:rules,firestore:indexes,functions
 - `functions/`: Cloud Functions (Node 22). Asignan el rol de cada usuario como custom claim, mandan
   las pushes y simulan los sensores. Antes de desplegar, copiá `functions/.env.example` a
   `functions/.env` y poné en `ADMIN_EMAILS` los emails que entran como administradores.
-- `functions/semilla.js`: datos semilla (3 estacionamientos, 2 niveles cada uno, 42 lugares). En el
-  proyecto real los carga un usuario `ADMIN` llamando a la function `cargarSemilla`; se puede
+- `functions/seed.js`: datos semilla (3 estacionamientos, 2 niveles cada uno, 42 lugares). En el
+  proyecto real los carga un usuario `ADMIN` llamando a la function `loadSeed`; se puede
   repetir sin duplicar y deja todos los lugares libres.
 - **Emuladores**, para probar sin tocar la base real. Necesitan Java 21 o superior:
 
   ```
   firebase emulators:start
-  node functions/scripts/sembrar.js
+  node functions/scripts/seed-emulators.js
   ```
 
   El segundo comando, en otra terminal, carga la semilla y crea un usuario por rol
-  (`conductor@sensorpark.test`, `encargado@sensorpark.test` y `admin@sensorpark.test`, con
+  (`driver@sensorpark.test`, `parking-admin@sensorpark.test` y `admin@sensorpark.test`, con
   contraseña `sensorpark`). Esas cuentas existen sólo en el emulador. La consola de los emuladores
   queda en http://localhost:4000.
 - `firestore-tests/`: tests de las reglas contra el emulador. Necesitan Java 21 o superior (sirve

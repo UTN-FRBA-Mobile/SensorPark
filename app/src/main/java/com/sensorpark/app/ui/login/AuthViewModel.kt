@@ -2,8 +2,8 @@ package com.sensorpark.app.ui.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sensorpark.domain.model.AuthErrorReason
 import com.sensorpark.domain.model.AuthException
-import com.sensorpark.domain.model.MotivoErrorAuth
 import com.sensorpark.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,44 +12,44 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class EstadoAuth(val cargando: Boolean = false, val error: String? = null)
+data class AuthUiState(val loading: Boolean = false, val error: String? = null)
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
 ) : ViewModel() {
-    private val _estado = MutableStateFlow(EstadoAuth())
-    val estado: StateFlow<EstadoAuth> = _estado.asStateFlow()
+    private val _state = MutableStateFlow(AuthUiState())
+    val state: StateFlow<AuthUiState> = _state.asStateFlow()
 
-    fun ingresar(email: String, password: String) = ejecutar {
-        authRepository.ingresar(email.trim(), password)
+    fun signIn(email: String, password: String) = execute {
+        authRepository.signIn(email.trim(), password)
     }
 
-    fun registrar(nombre: String, email: String, password: String) = ejecutar {
-        authRepository.registrar(nombre.trim(), email.trim(), password)
+    fun signUp(name: String, email: String, password: String) = execute {
+        authRepository.signUp(name.trim(), email.trim(), password)
     }
 
-    // Si sale bien no hay nada que navegar: NavegacionApp reacciona al cambio de sesión.
-    private fun ejecutar(accion: suspend () -> Unit) {
-        if (_estado.value.cargando) return
-        _estado.value = EstadoAuth(cargando = true)
+    // Si sale bien no hay nada que navegar: AppNavigation reacciona al cambio de sesión.
+    private fun execute(action: suspend () -> Unit) {
+        if (_state.value.loading) return
+        _state.value = AuthUiState(loading = true)
         viewModelScope.launch {
-            _estado.value = try {
-                accion()
-                EstadoAuth()
+            _state.value = try {
+                action()
+                AuthUiState()
             } catch (e: AuthException) {
-                EstadoAuth(error = mensajeDe(e.motivo))
+                AuthUiState(error = messageFor(e.reason))
             } catch (e: Exception) {
-                EstadoAuth(error = mensajeDe(MotivoErrorAuth.DESCONOCIDO))
+                AuthUiState(error = messageFor(AuthErrorReason.UNKNOWN))
             }
         }
     }
 
-    private fun mensajeDe(motivo: MotivoErrorAuth): String = when (motivo) {
-        MotivoErrorAuth.PASSWORD_DEBIL -> "La contraseña debe tener al menos 6 caracteres."
-        MotivoErrorAuth.EMAIL_EN_USO -> "Ya existe una cuenta con ese email."
-        MotivoErrorAuth.CREDENCIALES_INVALIDAS -> "Email o contraseña incorrectos."
-        MotivoErrorAuth.SIN_CONEXION -> "Sin respuesta del servidor. Revisá tu conexión."
-        MotivoErrorAuth.DESCONOCIDO -> "No se pudo completar la operación. Intentá de nuevo."
+    private fun messageFor(reason: AuthErrorReason): String = when (reason) {
+        AuthErrorReason.WEAK_PASSWORD -> "La contraseña debe tener al menos 6 caracteres."
+        AuthErrorReason.EMAIL_IN_USE -> "Ya existe una cuenta con ese email."
+        AuthErrorReason.INVALID_CREDENTIALS -> "Email o contraseña incorrectos."
+        AuthErrorReason.NO_CONNECTION -> "Sin respuesta del servidor. Revisá tu conexión."
+        AuthErrorReason.UNKNOWN -> "No se pudo completar la operación. Intentá de nuevo."
     }
 }
