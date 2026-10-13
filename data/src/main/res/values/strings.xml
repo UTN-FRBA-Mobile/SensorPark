@@ -1,4 +1,4 @@
 <resources>
-    <string name="canal_general">Avisos de SensorPark</string>
-    <string name="notificacion_titulo_default">SensorPark</string>
+    <string name="general_channel_name">Avisos de SensorPark</string>
+    <string name="notification_default_title">SensorPark</string>
 </resources>
