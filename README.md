@@ -97,6 +97,20 @@ firebase deploy --only firestore:rules,firestore:indexes,functions
 - `functions/`: Cloud Functions (Node 22). Asignan el rol de cada usuario como custom claim, mandan
   las pushes y simulan los sensores. Antes de desplegar, copiá `functions/.env.example` a
   `functions/.env` y poné en `ADMIN_EMAILS` los emails que entran como administradores.
+- `functions/semilla.js`: datos semilla (3 estacionamientos, 2 niveles cada uno, 42 lugares). En el
+  proyecto real los carga un usuario `ADMIN` llamando a la function `cargarSemilla`; se puede
+  repetir sin duplicar y deja todos los lugares libres.
+- **Emuladores**, para probar sin tocar la base real. Necesitan Java 21 o superior:
+
+  ```
+  firebase emulators:start
+  node functions/scripts/sembrar.js
+  ```
+
+  El segundo comando, en otra terminal, carga la semilla y crea un usuario por rol
+  (`conductor@sensorpark.test`, `encargado@sensorpark.test` y `admin@sensorpark.test`, con
+  contraseña `sensorpark`). Esas cuentas existen sólo en el emulador. La consola de los emuladores
+  queda en http://localhost:4000.
 - `firestore-tests/`: tests de las reglas contra el emulador. Necesitan Java 21 o superior (sirve
   el `jbr` de Android Studio como `JAVA_HOME`).
 

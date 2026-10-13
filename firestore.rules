@@ -2,6 +2,8 @@ rules_version = '2';
 
 // Firestore deniega todo lo que no tenga un `allow` explícito: colección nueva = regla nueva.
 // Las reglas no son filtros: la query del cliente tiene que llevar el mismo `where` que la regla exige.
+// Las Cloud Functions usan el Admin SDK y no pasan por estas reglas: lo que acá no tiene `allow`
+// de escritura (reservas, lista de espera, contadores) lo escriben sólo ellas.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -9,39 +11,53 @@ service cloud.firestore {
     function esDuenio(uid) { return autenticado() && request.auth.uid == uid; }
 
     // El rol es un custom claim que sólo asigna el backend (functions/index.js).
-    function tieneRol(rol) { return autenticado() && request.auth.token.rol == rol; }
+    function tieneRol(rol) { return autenticado() && request.auth.token.get('rol', '') == rol; }
     function esAdmin() { return tieneRol('ADMIN'); }
 
-    // get() porque se evalúa también desde la subcolección de cocheras, donde `resource` es el hijo.
+    // get() porque se evalúa también desde subcolecciones y desde reservas, donde `resource` es otro documento.
     function administra(eid) {
       return tieneRol('ADMIN_ESTACIONAMIENTO') &&
         request.auth.uid in get(/databases/$(database)/documents/estacionamientos/$(eid)).data.adminUids;
     }
 
-    // Perfil, token FCM y preferencias. El dueño nunca puede escribir su propio `rol`.
-    match /users/{uid} {
+    function cambia(campos) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(campos);
+    }
+
+    // Perfil, token FCM y preferencias. El dueño nunca puede escribir su rol ni su categoría de prioridad.
+    match /usuarios/{uid} {
       allow read: if esDuenio(uid) || esAdmin();
-      allow create: if esDuenio(uid) && !('rol' in request.resource.data);
-      allow update: if esDuenio(uid) &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rol']);
+      allow create: if esDuenio(uid) && !request.resource.data.keys().hasAny(['rol', 'categoria']);
+      allow update: if esDuenio(uid) && !cambia(['rol', 'categoria']);
     }
 
     match /estacionamientos/{eid} {
       allow read: if autenticado();
       allow create, delete: if esAdmin();
-      allow update: if esAdmin() || administra(eid);
+      // Su administrador edita los datos, pero no los contadores ni quién lo administra.
+      allow update: if esAdmin() ||
+        (administra(eid) && !cambia(['adminUids', 'capacidad', 'libres', 'libresPorTipo']));
 
-      // La ocupación la escribe el simulador de sensores con el Admin SDK, que no pasa por las reglas.
-      match /cocheras/{cid} {
+      match /lugares/{lid} {
+        allow read: if autenticado();
+        allow write: if esAdmin() || administra(eid);
+      }
+
+      // Cupos por prioridad de una fecha (id del documento: AAAA-MM-DD).
+      match /cupos/{fecha} {
         allow read: if autenticado();
         allow write: if esAdmin() || administra(eid);
       }
     }
 
     match /reservas/{rid} {
-      allow read: if esAdmin() || (autenticado() && resource.data.conductorUid == request.auth.uid);
-      allow create: if tieneRol('CONDUCTOR') && request.resource.data.conductorUid == request.auth.uid;
-      allow delete: if autenticado() && resource.data.conductorUid == request.auth.uid;
+      allow read: if esAdmin() ||
+        (autenticado() && resource.data.usuarioId == request.auth.uid) ||
+        administra(resource.data.estacionamientoId);
+    }
+
+    match /listaEspera/{id} {
+      allow read: if esAdmin() || (autenticado() && resource.data.usuarioId == request.auth.uid);
     }
   }
 }
