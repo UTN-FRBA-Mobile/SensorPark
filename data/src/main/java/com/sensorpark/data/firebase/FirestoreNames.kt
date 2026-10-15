@@ -18,6 +18,9 @@ object UserFields {
     const val NAME = "name"
     const val EMAIL = "email"
     const val ROLE = "role"
+
+    /** Rol que pide el usuario al registrarse; `assignInitialRole` lo valida y lo borra. */
+    const val REQUESTED_ROLE = "requestedRole"
     const val CATEGORY = "category"
     const val FCM_TOKEN = "fcmToken"
     const val CREATED_AT = "createdAt"

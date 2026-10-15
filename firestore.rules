@@ -24,17 +24,31 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
     }
 
-    // Perfil, token FCM y preferencias. El dueño nunca puede escribir su rol ni su categoría de prioridad.
-    match /users/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
-      allow create: if isOwner(uid) && !request.resource.data.keys().hasAny(['role', 'category']);
-      allow update: if isOwner(uid) && !changes(['role', 'category']);
+    // La categoría de prioridad es de buena fe: la declara el propio usuario.
+    function validCategory() {
+      return !('category' in request.resource.data) ||
+        request.resource.data.category in ['STANDARD', 'PREGNANT', 'REDUCED_MOBILITY'];
     }
 
-    // Estacionamientos.
+    // Perfil, token FCM y preferencias. El dueño nunca escribe su rol: lo asigna el backend.
+    // Al registrarse puede pedir un rol con `requestedRole`; `ADMIN` no se puede pedir.
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && !('role' in request.resource.data) && validCategory() &&
+        (!('requestedRole' in request.resource.data) ||
+          request.resource.data.requestedRole in ['DRIVER', 'PARKING_ADMIN']);
+      allow update: if isOwner(uid) && !changes(['role', 'requestedRole']) && validCategory();
+    }
+
+    // Estacionamientos. Los crea un administrador de estacionamiento, que queda como su único
+    // administrador. Los contadores de lugares los calcula el backend.
     match /parkingLots/{lotId} {
       allow read: if isSignedIn();
-      allow create, delete: if isAdmin();
+      allow create: if isAdmin() ||
+        (hasRole('PARKING_ADMIN') &&
+          request.resource.data.adminUids == [request.auth.uid] &&
+          !request.resource.data.keys().hasAny(['capacity', 'freeSpots', 'freeSpotsByType']));
+      allow delete: if isAdmin() || managesParkingLot(lotId);
       // Su administrador edita los datos, pero no los contadores ni quién lo administra.
       allow update: if isAdmin() ||
         (managesParkingLot(lotId) && !changes(['adminUids', 'capacity', 'freeSpots', 'freeSpotsByType']));

@@ -16,8 +16,8 @@ setGlobalOptions({ region: "southamerica-east1", maxInstances: 5 });
 initializeApp();
 const db = getFirestore();
 
-// DRIVER: usuario final. PARKING_ADMIN: administra los estacionamientos donde figura en
-// `adminUids`. ADMIN: acceso total, sólo para desarrollo y pruebas.
+// DRIVER: conductor, el usuario final. PARKING_ADMIN: crea y administra estacionamientos (los que
+// lo tienen en `adminUids`). ADMIN: superusuario del sistema, sólo para desarrollo y pruebas.
 const ROLES = ["DRIVER", "PARKING_ADMIN", "ADMIN"];
 const INITIAL_CATEGORY = "STANDARD";
 const ADMIN_EMAILS = defineString("ADMIN_EMAILS", { default: "" });
@@ -35,22 +35,32 @@ async function setRole(uid, role) {
   await db.doc(`users/${uid}`).set({ role }, { merge: true });
 }
 
-// Todo usuario nuevo entra como DRIVER y con categoría STANDARD, salvo los emails de
-// ADMIN_EMAILS, que entran como ADMIN.
+// Roles que un usuario puede elegir al registrarse. ADMIN no: sale sólo de ADMIN_EMAILS.
+const SELF_SERVICE_ROLES = ["DRIVER", "PARKING_ADMIN"];
+
+// Asigna el rol de una cuenta nueva: el que pidió al registrarse (`requestedRole`), DRIVER si no
+// pidió ninguno, o ADMIN si su email está en ADMIN_EMAILS. Completa los datos del perfil que falten.
 exports.assignInitialRole = onDocumentCreated("users/{uid}", async (event) => {
   const uid = event.params.uid;
+  const profile = event.data.data();
   const user = await getAuth().getUser(uid);
   const currentRole = user.customClaims && user.customClaims.role;
 
+  const missing = { requestedRole: FieldValue.delete() };
+  if (!profile.email && user.email) missing.email = user.email;
+  if (!profile.category) missing.category = INITIAL_CATEGORY;
+
   if (currentRole) {
     // La cuenta ya tenía rol y su documento se volvió a crear: sólo se repone el aviso.
-    await event.data.ref.set({ role: currentRole, category: INITIAL_CATEGORY }, { merge: true });
+    await event.data.ref.set({ ...missing, role: currentRole }, { merge: true });
     return;
   }
 
   const admins = ADMIN_EMAILS.value().split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
-  const role = admins.includes((user.email || "").toLowerCase()) ? "ADMIN" : "DRIVER";
-  await event.data.ref.set({ category: INITIAL_CATEGORY }, { merge: true });
+  const role = admins.includes((user.email || "").toLowerCase())
+    ? "ADMIN"
+    : SELF_SERVICE_ROLES.includes(profile.requestedRole) ? profile.requestedRole : "DRIVER";
+  await event.data.ref.set(missing, { merge: true });
   await setRole(uid, role);
   logger.info("Rol inicial asignado", { uid, role });
 });

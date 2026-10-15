@@ -37,6 +37,7 @@ firestore-tests/node_modules/
 functions/.env
 functions/.env.*
 !functions/.env.example
+!functions/.env.demo-sensorpark
 firebase-debug.log
 firestore-debug.log
 ui-debug.log

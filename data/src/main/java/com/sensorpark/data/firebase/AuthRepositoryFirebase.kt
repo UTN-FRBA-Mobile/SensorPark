@@ -11,6 +11,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.sensorpark.domain.model.AuthErrorReason
 import com.sensorpark.domain.model.AuthException
+import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.Role
 import com.sensorpark.domain.model.Session
 import com.sensorpark.domain.repository.AuthRepository
@@ -38,21 +39,35 @@ class AuthRepositoryFirebase @Inject constructor(
     }
 
     override suspend fun signIn(email: String, password: String) = translatingErrors {
-        auth.signInWithEmailAndPassword(email, password).await()
+        val uid = auth.signInWithEmailAndPassword(email, password).await().user!!.uid
+        // Si la cuenta se quedó sin documento (por ejemplo, porque se borró a mano), crearlo
+        // dispara `assignInitialRole` y la cuenta no queda esperando un rol para siempre.
+        db.collection(Collections.USERS).document(uid)
+            .set(mapOf(UserFields.EMAIL to email), SetOptions.merge())
+            .await()
         Unit
     }
 
     /**
-     * Crea la cuenta y su documento `users/{uid}`. El rol NO se escribe desde acá:
-     * lo asigna la function `assignInitialRole` al ver el documento nuevo.
+     * Crea la cuenta y su documento `users/{uid}`. El rol NO se escribe desde acá: se pide en
+     * `requestedRole` y lo asigna la function `assignInitialRole` al ver el documento nuevo.
      */
-    override suspend fun signUp(name: String, email: String, password: String) = translatingErrors {
+    override suspend fun signUp(
+        name: String,
+        email: String,
+        password: String,
+        role: Role,
+        category: Category,
+    ) = translatingErrors {
+        require(role != Role.ADMIN) { "El rol ADMIN no se puede pedir al registrarse." }
         val uid = auth.createUserWithEmailAndPassword(email, password).await().user!!.uid
-        // merge: el registro del token FCM puede haber creado el documento antes.
+        // Tiene que ser lo primero que se escribe: el trigger mira sólo la creación del documento.
         db.collection(Collections.USERS).document(uid).set(
             mapOf(
                 UserFields.NAME to name,
                 UserFields.EMAIL to email,
+                UserFields.REQUESTED_ROLE to role.name,
+                UserFields.CATEGORY to category.name,
                 UserFields.CREATED_AT to FieldValue.serverTimestamp(),
             ),
             SetOptions.merge(),

@@ -34,6 +34,9 @@ Backend (requiere la Firebase CLI, con `firebase login` hecho):
 # Tests de las reglas de Firestore. La primera vez: npm install dentro de firestore-tests
 firebase emulators:exec --only firestore --project demo-sensorpark "npm --prefix firestore-tests test"
 
+# Tests de las functions de roles. La primera vez: npm install dentro de functions
+firebase emulators:exec --only auth,firestore,functions --project demo-sensorpark "npm --prefix functions test"
+
 # Emuladores locales, para probar sin tocar la base real
 firebase emulators:start
 node functions/scripts/seed-emulators.js       # en otra terminal: carga datos y usuarios de prueba
@@ -102,10 +105,10 @@ Firestore y las functions están en `southamerica-east1`. La región está escri
 
 | Colección | Qué guarda | Quién escribe |
 |---|---|---|
-| `users/{uid}` | Nombre, email, rol, categoría, token FCM | El dueño, salvo `role` y `category` |
-| `parkingLots/{id}` | Estacionamientos: datos, niveles y contadores de lugares libres | `ADMIN` o su administrador, salvo contadores y `adminUids` |
-| `parkingLots/{id}/spots/{id}` | Lugares: código, nivel, tipo y estado de cada lugar | `ADMIN` o su administrador |
-| `parkingLots/{id}/quotas/{fecha}` | Cupos por categoría para una fecha | `ADMIN` o su administrador |
+| `users/{uid}` | Nombre, email, rol, categoría, token FCM | El dueño, salvo `role` |
+| `parkingLots/{id}` | Estacionamientos: datos, niveles y contadores de lugares libres | Lo crea un `PARKING_ADMIN`, que queda como su administrador; los contadores, sólo el backend |
+| `parkingLots/{id}/spots/{id}` | Lugares: código, nivel, tipo y estado de cada lugar | Su administrador |
+| `parkingLots/{id}/quotas/{fecha}` | Cupos por categoría para una fecha | Su administrador |
 | `reservations/{id}` | Reservas | Sólo las functions |
 | `waitlist/{id}` | Lista de espera | Sólo las functions |
 
@@ -118,29 +121,40 @@ Los nombres de colecciones y campos están en `data/.../firebase/FirestoreNames.
 ### Reglas
 
 Firestore deniega todo lo que no tenga una regla explícita, así que una colección nueva necesita su
-regla. Todo cambio en `firestore.rules` lleva su caso en `firestore-tests/rules.test.js`.
+regla. Todo cambio en `firestore.rules` lleva su caso en `firestore-tests/rules.test.js`, y todo
+cambio en las functions de roles, en `functions/test/roles.test.js`.
 
 ### Roles
 
 | Rol | Quién es |
 |---|---|
-| `DRIVER` | Conductor: el usuario final. Es el rol de toda cuenta nueva |
-| `PARKING_ADMIN` | Administrador de estacionamiento: administra los estacionamientos donde figura en `adminUids` |
-| `ADMIN` | Acceso total. Sólo para desarrollo y pruebas |
+| `DRIVER` | Conductor: el usuario final |
+| `PARKING_ADMIN` | Administrador de estacionamiento: crea sus estacionamientos y administra los que lo tienen en `adminUids` |
+| `ADMIN` | Superusuario del sistema, con acceso total. Sólo para desarrollo y pruebas; no es parte del producto |
 
 - El rol viaja como custom claim `role` en el token del usuario; eso es lo que leen las reglas.
-- Lo asigna siempre el backend: `assignInitialRole` cuando se crea `users/{uid}`, y después un
-  `ADMIN` puede cambiarlo con la function `assignRole`.
+- El usuario elige su rol al registrarse, entre `DRIVER` y `PARKING_ADMIN`; es autogestivo y de
+  buena fe. La app lo pide en `users/{uid}.requestedRole` y lo asigna el backend:
+  `assignInitialRole` lo valida cuando se crea el documento y después borra `requestedRole`.
+  Sin rol pedido, la cuenta entra como `DRIVER`.
+- Un `ADMIN` puede cambiar el rol de cualquiera con la function `assignRole`.
 - `users/{uid}.role` es una copia para que la app sepa que tiene que refrescar el token. El
   dueño no puede escribirla.
 - Entran como `ADMIN` los emails de `ADMIN_EMAILS`. El valor se lee al desplegar las functions y el
   rol inicial se asigna una sola vez, así que hay que agregar el email y desplegar **antes** de
   registrar la cuenta.
-- Si el registro llega a ofrecer elegir "administrador", ese rol es `PARKING_ADMIN`.
   `ADMIN` nunca se elige desde la app.
+- El documento del usuario lo tiene que crear el registro, no el token FCM: por eso la app
+  registra el dispositivo recién cuando la cuenta ya tiene rol.
 
-Para probar con otro rol: registrar una cuenta nueva (entra como `DRIVER`) y cambiársela con
-`assignRole`. En los emuladores ya hay un usuario por rol.
+### Categoría de prioridad
+
+`users/{uid}.category` vale `STANDARD` (sin prioridad), `PREGNANT` (embarazo) o
+`REDUCED_MOBILITY` (movilidad reducida o discapacidad). Como el rol, es de buena fe: la elige el
+conductor al registrarse, en un selector aparte y opcional, y la puede cambiar desde Preferencias.
+Las reglas sólo validan que el valor exista. Sin categoría, `assignInitialRole` pone `STANDARD`.
+Para sumar una subcategoría hay que agregarla en `domain/model/Category.kt`, en `firestore.rules` y
+en el texto de `app/.../ui/profile/CategorySelector.kt`.
 
 ### Datos de prueba
 
