@@ -27,7 +27,7 @@ beforeEach(async () => {
       name: "Playa Centro", adminUids: ["encargado"], capacity: 1, freeSpots: 1,
     });
     await setDoc(doc(db, "parkingLots/e1/spots/A-01"), { code: "A-01", status: "FREE" });
-    await setDoc(doc(db, "parkingLots/e1/quotas/2026-11-02"), { PRIORITY: 10 });
+    await setDoc(doc(db, "parkingLots/e1/quotas/2026-11-02"), { PREGNANT: 10 });
     await setDoc(doc(db, "reservations/r1"), { userId: "ana", parkingLotId: "e1", spotId: "A-01" });
     await setDoc(doc(db, "waitlist/w1"), { userId: "ana", parkingLotId: "e1" });
   });
@@ -58,8 +58,19 @@ describe("usuarios", () => {
   test("el dueño no puede crearse con rol", () =>
     assertFails(setDoc(doc(as("beto"), "users/beto"), { name: "Beto", role: "ADMIN" })));
 
-  test("el dueño no puede crearse con categoría", () =>
-    assertFails(setDoc(doc(as("beto"), "users/beto"), { name: "Beto", category: "SUBSCRIBER" })));
+  test("al registrarse pide ser conductor o administrador de estacionamiento", async () => {
+    await assertSucceeds(setDoc(doc(as("beto"), "users/beto"), { name: "Beto", requestedRole: "DRIVER" }));
+    await assertSucceeds(setDoc(doc(as("caro"), "users/caro"), { name: "Caro", requestedRole: "PARKING_ADMIN" }));
+  });
+
+  test("al registrarse no puede pedir ser ADMIN", () =>
+    assertFails(setDoc(doc(as("beto"), "users/beto"), { name: "Beto", requestedRole: "ADMIN" })));
+
+  test("el dueño declara su categoría de prioridad", () =>
+    assertSucceeds(setDoc(doc(as("beto"), "users/beto"), { name: "Beto", category: "PREGNANT" })));
+
+  test("el dueño no declara una categoría inexistente", () =>
+    assertFails(setDoc(doc(as("beto"), "users/beto"), { name: "Beto", category: "VIP" })));
 
   test("el dueño actualiza su token FCM", () =>
     assertSucceeds(updateDoc(doc(driver("ana"), "users/ana"), { fcmToken: "t" })));
@@ -67,8 +78,14 @@ describe("usuarios", () => {
   test("el dueño no puede cambiarse el rol", () =>
     assertFails(updateDoc(doc(driver("ana"), "users/ana"), { role: "ADMIN" })));
 
-  test("el dueño no puede cambiarse la categoría", () =>
-    assertFails(updateDoc(doc(driver("ana"), "users/ana"), { category: "SUBSCRIBER" })));
+  test("el dueño no puede pedir otro rol después de registrarse", () =>
+    assertFails(updateDoc(doc(driver("ana"), "users/ana"), { requestedRole: "PARKING_ADMIN" })));
+
+  test("el dueño cambia su categoría desde el perfil", () =>
+    assertSucceeds(updateDoc(doc(driver("ana"), "users/ana"), { category: "REDUCED_MOBILITY" })));
+
+  test("el dueño no se pone una categoría inexistente", () =>
+    assertFails(updateDoc(doc(driver("ana"), "users/ana"), { category: "VIP" })));
 });
 
 describe("estacionamientos", () => {
@@ -83,6 +100,23 @@ describe("estacionamientos", () => {
 
   test("un ADMIN los crea", () =>
     assertSucceeds(setDoc(doc(admin(), "parkingLots/e2"), { name: "X", adminUids: [] })));
+
+  test("un administrador de estacionamiento crea el suyo", () =>
+    assertSucceeds(setDoc(doc(parkingAdmin("caro"), "parkingLots/e2"), { name: "X", adminUids: ["caro"] })));
+
+  test("al crearlo no puede dejar a otro como administrador", async () => {
+    await assertFails(setDoc(doc(parkingAdmin("caro"), "parkingLots/e2"), { name: "X", adminUids: ["otro"] }));
+    await assertFails(setDoc(doc(parkingAdmin("caro"), "parkingLots/e2"), { name: "X", adminUids: ["caro", "otro"] }));
+  });
+
+  test("al crearlo no carga los contadores", () =>
+    assertFails(setDoc(doc(parkingAdmin("caro"), "parkingLots/e2"), { name: "X", adminUids: ["caro"], freeSpots: 50 })));
+
+  test("su administrador lo borra", () =>
+    assertSucceeds(deleteDoc(doc(parkingAdmin("encargado"), "parkingLots/e1"))));
+
+  test("un administrador de otro estacionamiento no lo borra", () =>
+    assertFails(deleteDoc(doc(parkingAdmin("otro"), "parkingLots/e1"))));
 
   test("su encargado edita los datos", () =>
     assertSucceeds(updateDoc(doc(parkingAdmin("encargado"), "parkingLots/e1"), { name: "Nuevo" })));
@@ -119,10 +153,10 @@ describe("lugares y cupos", () => {
     assertSucceeds(getDoc(doc(driver("ana"), "parkingLots/e1/quotas/2026-11-02"))));
 
   test("su encargado define los cupos de una fecha", () =>
-    assertSucceeds(setDoc(doc(parkingAdmin("encargado"), "parkingLots/e1/quotas/2026-11-03"), { SUBSCRIBER: 20 })));
+    assertSucceeds(setDoc(doc(parkingAdmin("encargado"), "parkingLots/e1/quotas/2026-11-03"), { PREGNANT: 20 })));
 
   test("un conductor no define cupos", () =>
-    assertFails(setDoc(doc(driver("ana"), "parkingLots/e1/quotas/2026-11-03"), { SUBSCRIBER: 20 })));
+    assertFails(setDoc(doc(driver("ana"), "parkingLots/e1/quotas/2026-11-03"), { PREGNANT: 20 })));
 });
 
 describe("reservas", () => {

@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sensorpark.domain.model.AuthErrorReason
 import com.sensorpark.domain.model.AuthException
+import com.sensorpark.domain.model.Category
+import com.sensorpark.domain.model.Role
 import com.sensorpark.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,8 +27,8 @@ class AuthViewModel @Inject constructor(
         authRepository.signIn(email.trim(), password)
     }
 
-    fun signUp(name: String, email: String, password: String) = execute {
-        authRepository.signUp(name.trim(), email.trim(), password)
+    fun signUp(name: String, email: String, password: String, role: Role, category: Category) = execute {
+        authRepository.signUp(name.trim(), email.trim(), password, role, category)
     }
 
     // Si sale bien no hay nada que navegar: AppNavigation reacciona al cambio de sesión.

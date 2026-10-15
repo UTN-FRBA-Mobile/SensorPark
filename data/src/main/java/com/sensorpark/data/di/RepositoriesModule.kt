@@ -2,8 +2,10 @@ package com.sensorpark.data.di
 
 import com.sensorpark.data.firebase.AuthRepositoryFirebase
 import com.sensorpark.data.firebase.DeviceRepositoryFirebase
+import com.sensorpark.data.firebase.UserRepositoryFirebase
 import com.sensorpark.domain.repository.AuthRepository
 import com.sensorpark.domain.repository.DeviceRepository
+import com.sensorpark.domain.repository.UserRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -24,4 +26,8 @@ abstract class RepositoriesModule {
     @Binds
     @Singleton
     abstract fun deviceRepository(impl: DeviceRepositoryFirebase): DeviceRepository
+
+    @Binds
+    @Singleton
+    abstract fun userRepository(impl: UserRepositoryFirebase): UserRepository
 }
