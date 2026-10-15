@@ -1,5 +1,6 @@
 package com.sensorpark.domain.usecase
 
+import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.Role
 import com.sensorpark.domain.model.Session
 import com.sensorpark.domain.model.SessionState
@@ -22,7 +23,13 @@ class ObserveSessionStateUseCaseTest {
         val currentRole = MutableStateFlow(role)
 
         override suspend fun signIn(email: String, password: String) = Unit
-        override suspend fun signUp(name: String, email: String, password: String) = Unit
+        override suspend fun signUp(
+            name: String,
+            email: String,
+            password: String,
+            role: Role,
+            category: Category,
+        ) = Unit
         override fun signOut() { session.value = null }
         override fun role(uid: String): Flow<Role?> = currentRole
     }
