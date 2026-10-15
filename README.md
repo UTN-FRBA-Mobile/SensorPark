@@ -38,8 +38,8 @@ abrir el proyecto). No hace falta instalar Gradle ni un JDK aparte.
 4. Sincronizá Gradle y corré la configuración `app` en un emulador o dispositivo con Google Play
    Services.
 
-5. Creá una cuenta desde la app. Después de unos segundos de "Preparando tu cuenta…" aparece el
-   inicio provisorio, con un botón por pantalla. **Diagnóstico de configuración** verifica contra
+5. Creá una cuenta desde la app, eligiendo si sos conductor o administrás un estacionamiento.
+   Después de unos segundos de "Preparando tu cuenta…" aparece el inicio provisorio, con un botón por pantalla. **Diagnóstico de configuración** verifica contra
    el proyecto real Auth, el rol, Firestore, FCM, Functions y Maps.
 
 `google-services.json`, `local.properties` y `functions/.env` están en el `.gitignore`: ninguna
@@ -120,6 +120,13 @@ firebase deploy --only firestore:rules,firestore:indexes,functions
   ```
   cd firestore-tests && npm install && cd ..
   firebase emulators:exec --only firestore --project demo-sensorpark "npm --prefix firestore-tests test"
+  ```
+- `functions/test/`: tests de las functions de roles contra los emuladores de Auth, Firestore y
+  Functions. Usan `functions/.env.demo-sensorpark`, que tiene un email de prueba en `ADMIN_EMAILS`.
+
+  ```
+  cd functions && npm install && cd ..
+  firebase emulators:exec --only auth,firestore,functions --project demo-sensorpark "npm --prefix functions test"
   ```
 
 ## Tests

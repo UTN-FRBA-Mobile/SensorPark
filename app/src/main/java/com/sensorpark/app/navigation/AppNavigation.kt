@@ -52,10 +52,12 @@ fun AppNavigation(vm: SessionViewModel = hiltViewModel()) {
         null -> Loading()
         SessionState.SignedOut -> AuthNavigation()
         is SessionState.SignedIn -> {
-            RegisterDevice(vm::registerDevice)
             if (current.role == null) {
                 Loading(message = "Preparando tu cuenta…", onSignOut = vm::signOut)
             } else {
+                // Recién con el rol asignado: si el token se guardara antes, podría crear el documento
+                // del usuario antes que el registro, y el rol pedido se perdería.
+                RegisterDevice(vm::registerDevice)
                 MainNavigation(current, onSignOut = vm::signOut)
             }
         }
@@ -122,7 +124,7 @@ private fun MainNavigation(state: SessionState.SignedIn, onSignOut: () -> Unit) 
             CheckInScreen(reservationId = entry.arguments?.getString(DeepLinks.ARG_RESERVATION_ID).orEmpty())
         }
         composable(Route.Settings.pattern) {
-            SettingsScreen(onSignOut = onSignOut)
+            SettingsScreen(role = state.role, onSignOut = onSignOut)
         }
         composable(Route.Admin.pattern) {
             AdminScreen()
