@@ -108,12 +108,15 @@ class ParkingLotRepositoryFirebaseTest {
         @BeforeClass
         @JvmStatic
         fun useEmulators() {
-            auth.useEmulator(HOST, 9099)
-            db.useEmulator(HOST, 8080)
-            // Sin caché en disco: cada lectura va al emulador, no a lo que dejó una corrida anterior.
-            db.firestoreSettings = FirebaseFirestoreSettings.Builder()
-                .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
-                .build()
+            // Si otra clase de test ya los configuró, Firebase no deja hacerlo dos veces.
+            runCatching { auth.useEmulator(HOST, 9099) }
+            runCatching {
+                db.useEmulator(HOST, 8080)
+                // Sin caché en disco: cada lectura va al emulador, no a lo que dejó una corrida anterior.
+                db.firestoreSettings = FirebaseFirestoreSettings.Builder()
+                    .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
+                    .build()
+            }
         }
     }
 }

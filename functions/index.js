@@ -16,6 +16,8 @@ setGlobalOptions({ region: "southamerica-east1", maxInstances: 5 });
 
 initializeApp();
 const db = getFirestore();
+// Después de setGlobalOptions: si se carga antes, sus functions quedan en la región por defecto.
+const reservations = require("./reservations");
 
 // DRIVER: conductor, el usuario final. PARKING_ADMIN: crea y administra estacionamientos (los que
 // lo tienen en `adminUids`). ADMIN: superusuario del sistema, sólo para desarrollo y pruebas.
@@ -92,6 +94,15 @@ exports.updateFreeSpotCounters = onDocumentWritten("parkingLots/{lotId}/spots/{s
   await recountParkingLot(db, event.params.lotId);
 });
 
+// Reservas y lista de espera (ver reservations.js y docs/reservation-rules.md).
+exports.createReservation = reservations.createReservation;
+exports.cancelReservation = reservations.cancelReservation;
+exports.checkIn = reservations.checkIn;
+exports.checkOut = reservations.checkOut;
+exports.joinWaitlist = reservations.joinWaitlist;
+exports.leaveWaitlist = reservations.leaveWaitlist;
+exports.processReservations = reservations.processReservations;
+
 // Envía una push sólo `data` (todos strings) a los usuarios indicados y limpia tokens vencidos.
 async function sendPush(uids, data) {
   const docs = await Promise.all(uids.map((uid) => db.doc(`users/${uid}`).get()));
@@ -142,7 +153,8 @@ exports.sendTestPush = onCall(async (request) => {
 });
 
 // Simulador de sensores mínimo: cada corrida cambia algunos lugares entre FREE y OCCUPIED.
-// Los RESERVED y OUT_OF_SERVICE no se tocan. Los contadores los actualiza updateFreeSpotCounters.
+// Los RESERVED, OUT_OF_SERVICE y los ocupados por una reserva en uso no se tocan. Los contadores
+// los actualiza updateFreeSpotCounters.
 // Se pausa desde Cloud Scheduler en la consola de Google Cloud.
 const SPOTS_PER_RUN = 50;
 const CHANGE_PROBABILITY = 0.2;
@@ -154,7 +166,8 @@ exports.simulateSensors = onSchedule("every 5 minutes", async () => {
 
   spots.forEach((spot) => {
     const status = spot.get("status");
-    const movedBySensor = status === "FREE" || status === "OCCUPIED";
+    // Un lugar con un auto que hizo check-in (`inUseBy`) lo libera el check-out, no el sensor.
+    const movedBySensor = (status === "FREE" || status === "OCCUPIED") && !spot.get("inUseBy");
     if (!movedBySensor || Math.random() > CHANGE_PROBABILITY) return;
     batch.update(spot.ref, {
       status: status === "OCCUPIED" ? "FREE" : "OCCUPIED",

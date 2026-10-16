@@ -26,10 +26,12 @@ enum class SpotStatus {
     }
 }
 
-/** Un lugar de un estacionamiento. `code` es el que se ve pintado en el piso, por ejemplo "A-01". */
+/** Un lugar de un estacionamiento. `code` es el que se ve pintado en el piso, por ejemplo "07". */
 data class Spot(
     val id: String,
     val code: String,
     val type: SpotType,
     val status: SpotStatus,
+    /** Sólo en lugares [SpotType.PRIORITY]: la categoría que puede usarlo. */
+    val priorityCategory: Category? = null,
 )

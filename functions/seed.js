@@ -38,9 +38,14 @@ const SPOT_TYPES = [
   "PRIORITY", "PRIORITY", "MOTORCYCLE", "MOTORCYCLE", "EV_CHARGING", "EV_CHARGING",
 ];
 
+// Los dos preferenciales, uno por subcategoría: sólo los reserva quien declaró esa categoría.
+const PRIORITY_CATEGORIES = { "09": "PREGNANT", "10": "REDUCED_MOBILITY" };
+
 const SPOTS = SPOT_TYPES.map((type, i) => {
   const code = String(i + 1).padStart(2, "0");
-  return { id: code, code, type };
+  const spot = { id: code, code, type };
+  if (PRIORITY_CATEGORIES[code]) spot.priorityCategory = PRIORITY_CATEGORIES[code];
+  return spot;
 });
 
 // Carga la semilla en `db`. Conserva los administradores que ya tuviera cada estacionamiento.
@@ -73,6 +78,7 @@ async function seed(db) {
       batch.set(ref.collection("spots").doc(s.id), {
         code: s.code,
         type: s.type,
+        ...(s.priorityCategory ? { priorityCategory: s.priorityCategory } : {}),
         status: s.status,
         updatedAt: FieldValue.serverTimestamp(),
       });
