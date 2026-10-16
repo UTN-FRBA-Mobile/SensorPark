@@ -139,9 +139,8 @@ Firestore y las functions están en `southamerica-east1`. La región está escri
 |---|---|---|
 | `users/{uid}` | Nombre, email, rol, categoría, token FCM | El dueño, salvo `role` |
 | `parkingLots/{id}` | Estacionamientos: datos y contadores de lugares | Lo crea un `PARKING_ADMIN`, que queda como su administrador; los contadores, sólo el backend |
-| `parkingLots/{id}/spots/{id}` | Lugares: código, tipo y estado de cada lugar | Su administrador |
-| `parkingLots/{id}/quotas/{fecha}` | Cupos por categoría para una fecha | Su administrador |
-| `reservations/{id}` | Reservas | Sólo las functions |
+| `parkingLots/{id}/spots/{id}` | Lugares: código, tipo, estado y, en los preferenciales, `priorityCategory` | Su administrador |
+| `reservations/{id}` | Reservas: lugar, franja (`arrivesAt`, `durationMinutes`, `endsAt`), tolerancia y estado | Sólo las functions |
 | `waitlist/{id}` | Lista de espera | Sólo las functions |
 
 Estados de un lugar (`status`): `FREE`, `OCCUPIED`, `RESERVED`, `OUT_OF_SERVICE`. Tipos de lugar
@@ -192,6 +191,26 @@ La pantalla de diagnóstico también los muestra en vivo. El administrador ve lo
 
 Los nombres de colecciones y campos están en `data/.../firebase/FirestoreNames.kt` y se repiten en
 `firestore.rules` y en `functions/`. Si cambia uno, hay que cambiarlo en los tres a la vez.
+
+### Reservas
+
+Las reglas están en `docs/reservation-rules.md`, que es la referencia común: se implementan dos
+veces y las dos versiones tienen que decir lo mismo.
+
+- **Backend, con la última palabra:** `functions/reservationRules.js` (reglas puras) y
+  `functions/reservations.js` (functions invocables `createReservation`, `cancelReservation`,
+  `checkIn`, `checkOut`, `joinWaitlist`, `leaveWaitlist`, y `processReservations`, que cada minuto
+  marca los lugares que empiezan y vence las reservas sin check-in).
+- **App:** `domain/.../reservation/ReservationRules.kt` y los casos de uso de
+  `ReservationUseCases.kt`. Validan antes de llamar al backend, para responder rápido. La
+  disponibilidad la decide sólo el backend, porque la app no ve las reservas de los demás.
+- **Repositorio:** `ReservationRepository`. "Mis reservas" se lee en vivo de Firestore; las
+  acciones llaman a las functions y devuelven un `ReservationOutcome`: éxito, rechazo con un
+  `ReservationRejection` (el mismo `reason` que manda la function) o falla.
+
+Una reserva es para una hora de llegada con una duración fija (15 min, 30 min, 1 h, 2 h, 4 h u
+8 h). No se modifica: se cancela y se reserva de nuevo. Si cambia una regla, se cambia primero el
+documento y después las dos versiones, con sus tests.
 
 ### Reglas
 

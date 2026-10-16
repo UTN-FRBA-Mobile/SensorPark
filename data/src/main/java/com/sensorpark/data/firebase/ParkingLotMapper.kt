@@ -1,6 +1,7 @@
 package com.sensorpark.data.firebase
 
 import com.google.firebase.firestore.GeoPoint
+import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.model.Schedule
@@ -44,6 +45,7 @@ internal fun spotFrom(id: String, data: Map<String, Any?>): Spot? {
         code = data[SpotFields.CODE] as? String ?: id,
         type = type,
         status = status,
+        priorityCategory = (data[SpotFields.PRIORITY_CATEGORY] as? String)?.let { Category.from(it) },
     )
 }
 

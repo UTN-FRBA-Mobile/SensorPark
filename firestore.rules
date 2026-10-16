@@ -64,12 +64,6 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow write: if isAdmin() || managesParkingLot(lotId);
       }
-
-      // Cupos por categoría de prioridad de una fecha (id del documento: AAAA-MM-DD).
-      match /quotas/{date} {
-        allow read: if isSignedIn();
-        allow write: if isAdmin() || managesParkingLot(lotId);
-      }
     }
 
     // Reservas.
