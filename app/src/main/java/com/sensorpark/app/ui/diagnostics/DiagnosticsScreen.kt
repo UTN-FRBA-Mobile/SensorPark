@@ -25,6 +25,8 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.sensorpark.domain.model.DataResult
+import com.sensorpark.domain.model.NearbyParkingLot
 
 private val Green = Color(0xFF2E7D32)
 private val BuenosAires = LatLng(-34.6037, -58.3816)
@@ -33,6 +35,7 @@ private val BuenosAires = LatLng(-34.6037, -58.3816)
 @Composable
 fun DiagnosticsScreen(vm: DiagnosticsViewModel = hiltViewModel()) {
     val checks by vm.checks.collectAsStateWithLifecycle()
+    val parkingLots by vm.parkingLots.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -50,6 +53,8 @@ fun DiagnosticsScreen(vm: DiagnosticsViewModel = hiltViewModel()) {
             OutlinedButton(onClick = vm::runChecks) { Text("Reintentar") }
         }
 
+        ParkingLots(parkingLots)
+
         Text("Maps", style = MaterialTheme.typography.titleSmall)
         Text(
             "Si el mapa se ve gris, falta MAPS_API_KEY en local.properties o está mal restringida.",
@@ -63,6 +68,32 @@ fun DiagnosticsScreen(vm: DiagnosticsViewModel = hiltViewModel()) {
                 position = CameraPosition.fromLatLngZoom(BuenosAires, 12f)
             },
         )
+    }
+}
+
+@Composable
+private fun ParkingLots(result: DataResult<List<NearbyParkingLot>>?) {
+    Text("Estacionamientos en vivo", style = MaterialTheme.typography.titleSmall)
+    when (result) {
+        null -> Text("Cargando…", style = MaterialTheme.typography.bodySmall)
+        is DataResult.Failure -> Text("Error: ${result.reason}", color = MaterialTheme.colorScheme.error)
+        is DataResult.Success -> {
+            if (result.value.isEmpty()) {
+                Text("No hay estacionamientos: ¿se cargó la semilla?", style = MaterialTheme.typography.bodySmall)
+            }
+            result.value.forEach { (lot, distance) ->
+                Column {
+                    Text(
+                        "${lot.name}: ${lot.freeSpots}/${lot.capacity} libres · a ${(distance / 100).toInt() / 10.0} km",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        lot.freeSpotsByType.entries.joinToString(" · ") { (type, free) -> "$type $free/${lot.capacityOf(type)}" },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
     }
 }
 

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.hilt)
@@ -10,6 +12,21 @@ android {
 
     defaultConfig {
         minSdk = 26
+    }
+
+    buildTypes {
+        // Con FIREBASE_EMULATOR_HOST en local.properties, el build debug usa los emuladores de
+        // Firebase en vez del proyecto real. Desde el emulador de Android la PC es 10.0.2.2.
+        val emulatorHost = Properties().apply {
+            rootProject.file("local.properties").takeIf { it.exists() }
+                ?.inputStream()?.use { load(it) }
+        }.getProperty("FIREBASE_EMULATOR_HOST").orEmpty()
+        debug { buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"$emulatorHost\"") }
+        release { buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"\"") }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

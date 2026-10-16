@@ -14,6 +14,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.sensorpark.core.ui.R
 import androidx.compose.ui.unit.dp
 
 /** Botón de una pantalla provisoria: a dónde se puede ir desde ahí. */
@@ -40,7 +42,7 @@ fun PlaceholderScreen(
     ) {
         Text(title, style = MaterialTheme.typography.headlineMedium)
         Text(
-            detail ?: "Pantalla provisoria",
+            detail ?: stringResource(R.string.placeholder_detail),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

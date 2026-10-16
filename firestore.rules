@@ -20,6 +20,11 @@ service cloud.firestore {
         request.auth.uid in get(/databases/$(database)/documents/parkingLots/$(lotId)).data.adminUids;
     }
 
+    // Contadores de lugares del estacionamiento: los calcula la function updateFreeSpotCounters.
+    function counterFields() {
+      return ['capacity', 'freeSpots', 'capacityByType', 'freeSpotsByType'];
+    }
+
     function changes(fields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
     }
@@ -41,17 +46,18 @@ service cloud.firestore {
     }
 
     // Estacionamientos. Los crea un administrador de estacionamiento, que queda como su único
-    // administrador. Los contadores de lugares los calcula el backend.
+    // administrador. Los contadores de lugares los calcula el backend. Hace falta sesión para
+    // verlos: la app no muestra nada antes del ingreso.
     match /parkingLots/{lotId} {
       allow read: if isSignedIn();
       allow create: if isAdmin() ||
         (hasRole('PARKING_ADMIN') &&
           request.resource.data.adminUids == [request.auth.uid] &&
-          !request.resource.data.keys().hasAny(['capacity', 'freeSpots', 'freeSpotsByType']));
+          !request.resource.data.keys().hasAny(counterFields()));
       allow delete: if isAdmin() || managesParkingLot(lotId);
       // Su administrador edita los datos, pero no los contadores ni quién lo administra.
       allow update: if isAdmin() ||
-        (managesParkingLot(lotId) && !changes(['adminUids', 'capacity', 'freeSpots', 'freeSpotsByType']));
+        (managesParkingLot(lotId) && !changes(counterFields().concat(['adminUids'])));
 
       // Lugares del estacionamiento.
       match /spots/{spotId} {

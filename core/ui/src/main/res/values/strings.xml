@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textos comunes a varias pantallas. -->
+<resources>
+    <string name="spot_type_standard">Común</string>
+    <string name="spot_type_priority">Preferencial</string>
+    <string name="spot_type_motorcycle">Moto</string>
+    <string name="spot_type_ev_charging">Carga eléctrica</string>
+
+    <string name="availability_free">%1$d/%2$d libres</string>
+    <string name="availability_full">Completo</string>
+
+    <string name="error_not_found">No encontramos lo que buscabas.</string>
+    <string name="error_permission_denied">No tenés permiso para ver esto. Probá cerrar sesión y volver a entrar.</string>
+    <string name="error_no_connection">Sin conexión. Revisá tu internet.</string>
+    <string name="error_unknown">Algo salió mal.</string>
+
+    <string name="action_retry">Reintentar</string>
+    <string name="placeholder_detail">Pantalla provisoria</string>
+</resources>

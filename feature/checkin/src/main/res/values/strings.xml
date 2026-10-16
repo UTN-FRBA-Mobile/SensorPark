@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="check_in_title">Check-in</string>
+    <string name="check_in_pending">Próximamente: confirmar la llegada a la reserva %1$s con la ubicación del teléfono.</string>
+</resources>

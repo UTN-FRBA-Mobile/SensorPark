@@ -1,5 +1,5 @@
 const { setGlobalOptions } = require("firebase-functions/v2");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineString } = require("firebase-functions/params");
@@ -9,6 +9,7 @@ const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 const { seed } = require("./seed");
+const { affectsCounters, recountParkingLot } = require("./counters");
 
 // Tiene que ser la misma región que se eligió al crear la base de Firestore.
 setGlobalOptions({ region: "southamerica-east1", maxInstances: 5 });
@@ -84,6 +85,13 @@ exports.loadSeed = onCall(async (request) => {
   return result;
 });
 
+// Mantiene los contadores de lugares del estacionamiento (ver counters.js) cada vez que se crea,
+// borra o cambia uno de sus lugares: lo dispara el simulador, la consola o su administrador.
+exports.updateFreeSpotCounters = onDocumentWritten("parkingLots/{lotId}/spots/{spotId}", async (event) => {
+  if (!affectsCounters(event.data.before.data(), event.data.after.data())) return;
+  await recountParkingLot(db, event.params.lotId);
+});
+
 // Envía una push sólo `data` (todos strings) a los usuarios indicados y limpia tokens vencidos.
 async function sendPush(uids, data) {
   const docs = await Promise.all(uids.map((uid) => db.doc(`users/${uid}`).get()));
@@ -134,8 +142,8 @@ exports.sendTestPush = onCall(async (request) => {
 });
 
 // Simulador de sensores mínimo: cada corrida cambia algunos lugares entre FREE y OCCUPIED.
-// Los RESERVED y OUT_OF_SERVICE no se tocan. Todavía no actualiza los contadores de
-// lugares libres del estacionamiento. Se pausa desde Cloud Scheduler en la consola de Google Cloud.
+// Los RESERVED y OUT_OF_SERVICE no se tocan. Los contadores los actualiza updateFreeSpotCounters.
+// Se pausa desde Cloud Scheduler en la consola de Google Cloud.
 const SPOTS_PER_RUN = 50;
 const CHANGE_PROBABILITY = 0.2;
 

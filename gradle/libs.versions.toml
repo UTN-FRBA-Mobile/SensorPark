@@ -21,6 +21,8 @@ okhttp = "4.12.0"
 datastore = "1.1.1"
 work = "2.10.0"
 junit = "4.13.2"
+androidxTestRunner = "1.6.2"
+androidxTestJunit = "1.2.1"
 
 [libraries]
 # Compose
@@ -77,6 +79,8 @@ work-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref
 
 # Tests
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+androidx-test-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

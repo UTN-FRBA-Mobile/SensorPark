@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_free_of_total">%1$d de %2$d lugares libres</string>
+    <string name="detail_schedule">Horario</string>
+    <string name="detail_schedule_value">%1$s a %2$s</string>
+    <string name="detail_tolerance">Tolerancia de llegada</string>
+    <string name="detail_tolerance_value">%1$d min</string>
+    <string name="detail_rate">Tarifa</string>
+    <string name="detail_rate_value">%1$s por hora</string>
+    <string name="detail_by_type">Por tipo de lugar</string>
+    <string name="detail_reserve">Reservar un lugar</string>
+    <string name="detail_no_free_spots">Sin lugares libres</string>
+</resources>

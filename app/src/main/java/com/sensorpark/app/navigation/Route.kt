@@ -7,7 +7,7 @@ sealed class Route(val pattern: String) {
     data object Login : Route("login")
     data object SignUp : Route("sign-up")
 
-    data object Home : Route("home")
+    // Conductor
     data object Map : Route("map")
 
     data object ParkingLotDetail : Route("parking-lot/{$ARG_PARKING_LOT_ID}") {
@@ -20,16 +20,23 @@ sealed class Route(val pattern: String) {
 
     /** Destino del deep link `sensorpark://reservation/{id}`; sin id muestra la lista completa. */
     data object MyReservations :
-        Route("my-reservations?${DeepLinks.ARG_RESERVATION_ID}={${DeepLinks.ARG_RESERVATION_ID}}") {
-        fun create() = "my-reservations"
-    }
+        Route("my-reservations?${DeepLinks.ARG_RESERVATION_ID}={${DeepLinks.ARG_RESERVATION_ID}}")
 
     data object CheckIn : Route("check-in/{${DeepLinks.ARG_RESERVATION_ID}}") {
         fun create(reservationId: String) = "check-in/$reservationId"
     }
 
-    data object Settings : Route("settings")
-    data object Admin : Route("admin")
+    // Administrador de estacionamiento
+    data object ManagedParkingLots : Route("parking-lots")
+
+    data object ParkingLotPanel : Route("parking-lot-panel/{$ARG_PARKING_LOT_ID}") {
+        fun create(parkingLotId: String) = "parking-lot-panel/$parkingLotId"
+    }
+
+    data object CreateParkingLot : Route("create-parking-lot")
+
+    // Todos
+    data object Account : Route("account")
     data object Diagnostics : Route("diagnostics")
 
     companion object {

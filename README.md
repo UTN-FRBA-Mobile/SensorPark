@@ -39,8 +39,9 @@ abrir el proyecto). No hace falta instalar Gradle ni un JDK aparte.
    Services.
 
 5. Creá una cuenta desde la app, eligiendo si sos conductor o administrás un estacionamiento.
-   Después de unos segundos de "Preparando tu cuenta…" aparece el inicio provisorio, con un botón por pantalla. **Diagnóstico de configuración** verifica contra
-   el proyecto real Auth, el rol, Firestore, FCM, Functions y Maps.
+   Después de unos segundos de "Preparando tu cuenta…" aparecen las pestañas de tu rol. En
+   **Cuenta > Diagnóstico de configuración** (sólo en el build debug) se verifica contra el
+   proyecto real Auth, el rol, Firestore, FCM, Functions y Maps.
 
 `google-services.json`, `local.properties` y `functions/.env` están en el `.gitignore`: ninguna
 clave se sube al repositorio.
@@ -97,10 +98,10 @@ firebase deploy --only firestore:rules,firestore:indexes,functions
 ```
 
 - `firestore.rules` y `firestore.indexes.json`: reglas e índices de la base `(default)`.
-- `functions/`: Cloud Functions (Node 22). Asignan el rol de cada usuario como custom claim, mandan
-  las pushes y simulan los sensores. Antes de desplegar, copiá `functions/.env.example` a
+- `functions/`: Cloud Functions (Node 22). Asignan el rol de cada usuario como custom claim,
+  mantienen los contadores de lugares libres, mandan las pushes y simulan los sensores. Antes de desplegar, copiá `functions/.env.example` a
   `functions/.env` y poné en `ADMIN_EMAILS` los emails que entran como administradores.
-- `functions/seed.js`: datos semilla (3 estacionamientos, 2 niveles cada uno, 42 lugares). En el
+- `functions/seed.js`: datos semilla (3 estacionamientos de 14 lugares, 42 en total). En el
   proyecto real los carga un usuario `ADMIN` llamando a la function `loadSeed`; se puede
   repetir sin duplicar y deja todos los lugares libres.
 - **Emuladores**, para probar sin tocar la base real. Necesitan Java 21 o superior:
@@ -114,6 +115,10 @@ firebase deploy --only firestore:rules,firestore:indexes,functions
   (`driver@sensorpark.test`, `parking-admin@sensorpark.test` y `admin@sensorpark.test`, con
   contraseña `sensorpark`). Esas cuentas existen sólo en el emulador. La consola de los emuladores
   queda en http://localhost:4000.
+
+  Para que la app use los emuladores, agregá `FIREBASE_EMULATOR_HOST=10.0.2.2` a
+  `local.properties` y reinstalá el build debug (10.0.2.2 es tu PC vista desde el emulador de
+  Android). Sacando la línea, la app vuelve a la base real.
 - `firestore-tests/`: tests de las reglas contra el emulador. Necesitan Java 21 o superior (sirve
   el `jbr` de Android Studio como `JAVA_HOME`).
 
@@ -121,8 +126,8 @@ firebase deploy --only firestore:rules,firestore:indexes,functions
   cd firestore-tests && npm install && cd ..
   firebase emulators:exec --only firestore --project demo-sensorpark "npm --prefix firestore-tests test"
   ```
-- `functions/test/`: tests de las functions de roles contra los emuladores de Auth, Firestore y
-  Functions. Usan `functions/.env.demo-sensorpark`, que tiene un email de prueba en `ADMIN_EMAILS`.
+- `functions/test/`: tests de las functions de roles y de contadores contra los emuladores de
+  Auth, Firestore y Functions. Usan `functions/.env.demo-sensorpark`, que tiene un email de prueba en `ADMIN_EMAILS`.
 
   ```
   cd functions && npm install && cd ..
@@ -132,5 +137,12 @@ firebase deploy --only firestore:rules,firestore:indexes,functions
 ## Tests
 
 ```
-./gradlew :domain:test
+./gradlew :domain:test :data:testDebugUnitTest
+```
+
+Los tests de `app/src/androidTest` corren en el emulador de Android y hablan con los emuladores de
+Firebase, así que antes hay que levantarlos y cargar la semilla (ver arriba):
+
+```
+./gradlew :app:connectedDebugAndroidTest
 ```
