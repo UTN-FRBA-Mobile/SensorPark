@@ -85,7 +85,8 @@ Cómo se agrega algo:
   declara en `app/.../navigation/Route.kt` y se conecta en `AppNavigation.kt`, dentro del grafo
   de la pestaña a la que pertenece.
 - **Un texto que ve el usuario:** en el `res/values/strings.xml` del módulo que lo usa, en
-  español, y su traducción en `res/values-en/strings.xml`. Nunca escrito en el código.
+  español, nunca escrito en el código. La app es sólo en español, con formato argentino: no se
+  traduce.
 - **Un color con significado** (libre, ocupado, reservado, fuera de servicio): de
   `SensorParkTheme.colors` (`core/ui/theme/StatusColors.kt`), que ya tiene versión clara y oscura.
   El resto, de `MaterialTheme.colorScheme`.

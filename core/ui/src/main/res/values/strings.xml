@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Textos comunes a varias pantallas. La versión en inglés está en values-en. -->
+<!-- Textos comunes a varias pantallas. -->
 <resources>
     <string name="spot_type_standard">Común</string>
     <string name="spot_type_priority">Preferencial</string>

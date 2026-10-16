@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** [error] es el motivo; la pantalla elige el texto según el idioma. */
+/** [error] es el motivo; el texto lo elige la pantalla, desde strings.xml. */
 data class AuthUiState(val loading: Boolean = false, val error: AuthErrorReason? = null)
 
 @HiltViewModel

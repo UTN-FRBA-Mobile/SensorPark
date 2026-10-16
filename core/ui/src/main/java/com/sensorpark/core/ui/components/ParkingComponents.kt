@@ -50,10 +50,10 @@ fun DataErrorReason.message(): String = stringResource(
     },
 )
 
-/** "350 m" o "1,2 km", con el separador decimal del idioma del teléfono. */
+/** "350 m" o "1,2 km". La app es sólo en español, con formato argentino. */
 fun formatDistance(meters: Double): String =
     if (meters < 1_000) "${meters.roundToInt()} m"
-    else String.format(Locale.getDefault(), "%.1f km", meters / 1_000)
+    else String.format(Locale.forLanguageTag("es-AR"), "%.1f km", meters / 1_000)
 
 /** Pastilla con los lugares libres: verde si hay, ámbar si queda un cuarto o menos, rojo si está completo. */
 @Composable
