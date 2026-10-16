@@ -8,8 +8,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,27 +25,37 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.core.util.Consumer
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
+import com.sensorpark.app.R
+import com.sensorpark.app.ui.account.AccountScreen
 import com.sensorpark.app.ui.diagnostics.DiagnosticsScreen
-import com.sensorpark.app.ui.home.HomeScreen
 import com.sensorpark.app.ui.login.LoginScreen
 import com.sensorpark.app.ui.login.SignUpScreen
-import com.sensorpark.app.ui.settings.SettingsScreen
+import com.sensorpark.domain.model.Role
 import com.sensorpark.domain.model.SessionState
 import com.sensorpark.domain.navigation.DeepLinks
-import com.sensorpark.feature.admin.AdminScreen
+import com.sensorpark.feature.admin.CreateParkingLotScreen
+import com.sensorpark.feature.admin.ManagedParkingLotsScreen
+import com.sensorpark.feature.admin.ParkingLotPanelScreen
 import com.sensorpark.feature.checkin.CheckInScreen
-import com.sensorpark.feature.parking.ParkingLotDetailScreen
 import com.sensorpark.feature.map.MapScreen
+import com.sensorpark.feature.parking.ParkingLotDetailScreen
 import com.sensorpark.feature.reservations.MyReservationsScreen
 import com.sensorpark.feature.reservations.ReserveScreen
 
@@ -52,13 +68,14 @@ fun AppNavigation(vm: SessionViewModel = hiltViewModel()) {
         null -> Loading()
         SessionState.SignedOut -> AuthNavigation()
         is SessionState.SignedIn -> {
-            if (current.role == null) {
-                Loading(message = "Preparando tu cuenta…", onSignOut = vm::signOut)
+            val role = current.role
+            if (role == null) {
+                Loading(message = stringResource(R.string.session_preparing), onSignOut = vm::signOut)
             } else {
                 // Recién con el rol asignado: si el token se guardara antes, podría crear el documento
                 // del usuario antes que el registro, y el rol pedido se perdería.
                 RegisterDevice(vm::registerDevice)
-                MainNavigation(current, onSignOut = vm::signOut)
+                MainNavigation(current, role, onSignOut = vm::signOut)
             }
         }
     }
@@ -78,18 +95,58 @@ private fun AuthNavigation() {
 }
 
 /**
- * Grafo de la app con sesión. Los features no se conocen entre sí ni conocen las rutas:
- * cada pantalla recibe lambdas y acá se decide a dónde lleva cada una.
+ * La app con sesión: una barra inferior con las pestañas del rol (ver [Tab]). Los features no se
+ * conocen entre sí ni conocen las rutas: cada pantalla recibe lambdas y acá se decide a dónde lleva.
  */
 @Composable
-private fun MainNavigation(state: SessionState.SignedIn, onSignOut: () -> Unit) {
+private fun MainNavigation(state: SessionState.SignedIn, role: Role, onSignOut: () -> Unit) {
     val nav = rememberNavController()
     HandleNewDeepLinks(nav)
+    val tabs = Tab.forRole(role)
+    val backStackEntry by nav.currentBackStackEntryAsState()
+    val destination = backStackEntry?.destination
 
-    NavHost(navController = nav, startDestination = Route.Home.pattern) {
-        composable(Route.Home.pattern) {
-            HomeScreen(state = state, navigateTo = { nav.navigate(it) })
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                tabs.forEach { tab ->
+                    NavigationBarItem(
+                        selected = destination?.hierarchy?.any { it.route == tab.graph } == true,
+                        onClick = { nav.navigateToTab(tab) },
+                        icon = { Icon(tab.icon, contentDescription = null) },
+                        label = { Text(stringResource(tab.label)) },
+                    )
+                }
+            }
+        },
+    ) { padding ->
+        NavHost(
+            navController = nav,
+            startDestination = tabs.first().graph,
+            modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+        ) {
+            if (role == Role.DRIVER) {
+                searchTab(nav)
+                reservationsTab(nav)
+            } else {
+                parkingLotsTab(nav, uid = state.session.uid, seesAll = role == Role.ADMIN)
+            }
+            accountTab(nav, state, onSignOut)
         }
+    }
+}
+
+/** Cambia de pestaña conservando la pila de cada una, como recomienda Navigation. */
+private fun NavHostController.navigateToTab(tab: Tab) {
+    navigate(tab.graph) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
+private fun NavGraphBuilder.searchTab(nav: NavHostController) {
+    navigation(startDestination = Tab.SEARCH.start.pattern, route = Tab.SEARCH.graph) {
         composable(Route.Map.pattern) {
             MapScreen(onOpenParkingLot = { nav.navigate(Route.ParkingLotDetail.create(it)) })
         }
@@ -102,9 +159,14 @@ private fun MainNavigation(state: SessionState.SignedIn, onSignOut: () -> Unit) 
         composable(Route.Reserve.pattern) { entry ->
             ReserveScreen(
                 parkingLotId = entry.arguments?.getString(Route.ARG_PARKING_LOT_ID).orEmpty(),
-                onOpenMyReservations = { nav.navigate(Route.MyReservations.create()) },
+                onOpenMyReservations = { nav.navigateToTab(Tab.RESERVATIONS) },
             )
         }
+    }
+}
+
+private fun NavGraphBuilder.reservationsTab(nav: NavHostController) {
+    navigation(startDestination = Tab.RESERVATIONS.start.pattern, route = Tab.RESERVATIONS.graph) {
         composable(
             route = Route.MyReservations.pattern,
             arguments = listOf(
@@ -123,11 +185,36 @@ private fun MainNavigation(state: SessionState.SignedIn, onSignOut: () -> Unit) 
         composable(Route.CheckIn.pattern) { entry ->
             CheckInScreen(reservationId = entry.arguments?.getString(DeepLinks.ARG_RESERVATION_ID).orEmpty())
         }
-        composable(Route.Settings.pattern) {
-            SettingsScreen(role = state.role, onSignOut = onSignOut)
+    }
+}
+
+private fun NavGraphBuilder.parkingLotsTab(nav: NavHostController, uid: String, seesAll: Boolean) {
+    navigation(startDestination = Tab.PARKING_LOTS.start.pattern, route = Tab.PARKING_LOTS.graph) {
+        composable(Route.ManagedParkingLots.pattern) {
+            ManagedParkingLotsScreen(
+                uid = uid,
+                seesAll = seesAll,
+                onOpenParkingLot = { nav.navigate(Route.ParkingLotPanel.create(it)) },
+                onCreateParkingLot = { nav.navigate(Route.CreateParkingLot.pattern) },
+            )
         }
-        composable(Route.Admin.pattern) {
-            AdminScreen()
+        composable(Route.ParkingLotPanel.pattern) { entry ->
+            ParkingLotPanelScreen(parkingLotId = entry.arguments?.getString(Route.ARG_PARKING_LOT_ID).orEmpty())
+        }
+        composable(Route.CreateParkingLot.pattern) {
+            CreateParkingLotScreen()
+        }
+    }
+}
+
+private fun NavGraphBuilder.accountTab(nav: NavHostController, state: SessionState.SignedIn, onSignOut: () -> Unit) {
+    navigation(startDestination = Tab.ACCOUNT.start.pattern, route = Tab.ACCOUNT.graph) {
+        composable(Route.Account.pattern) {
+            AccountScreen(
+                state = state,
+                onSignOut = onSignOut,
+                onOpenDiagnostics = { nav.navigate(Route.Diagnostics.pattern) },
+            )
         }
         composable(Route.Diagnostics.pattern) {
             DiagnosticsScreen()
@@ -162,11 +249,11 @@ private fun RegisterDevice(register: () -> Unit) {
 private fun Loading(message: String? = null, onSignOut: (() -> Unit)? = null) {
     Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         CircularProgressIndicator()
         if (message != null) Text(message)
-        if (onSignOut != null) TextButton(onClick = onSignOut) { Text("Cerrar sesión") }
+        if (onSignOut != null) TextButton(onClick = onSignOut) { Text(stringResource(R.string.action_sign_out)) }
     }
 }

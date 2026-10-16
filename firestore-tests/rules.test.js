@@ -109,8 +109,11 @@ describe("estacionamientos", () => {
     await assertFails(setDoc(doc(parkingAdmin("caro"), "parkingLots/e2"), { name: "X", adminUids: ["caro", "otro"] }));
   });
 
-  test("al crearlo no carga los contadores", () =>
-    assertFails(setDoc(doc(parkingAdmin("caro"), "parkingLots/e2"), { name: "X", adminUids: ["caro"], freeSpots: 50 })));
+  test("al crearlo no carga los contadores", async () => {
+    await assertFails(setDoc(doc(parkingAdmin("caro"), "parkingLots/e2"), { name: "X", adminUids: ["caro"], freeSpots: 50 }));
+    await assertFails(setDoc(doc(parkingAdmin("caro"), "parkingLots/e2"),
+      { name: "X", adminUids: ["caro"], capacityByType: { STANDARD: 50 } }));
+  });
 
   test("su administrador lo borra", () =>
     assertSucceeds(deleteDoc(doc(parkingAdmin("encargado"), "parkingLots/e1"))));
@@ -121,8 +124,16 @@ describe("estacionamientos", () => {
   test("su encargado edita los datos", () =>
     assertSucceeds(updateDoc(doc(parkingAdmin("encargado"), "parkingLots/e1"), { name: "Nuevo" })));
 
-  test("su encargado no toca los contadores", () =>
-    assertFails(updateDoc(doc(parkingAdmin("encargado"), "parkingLots/e1"), { freeSpots: 99 })));
+  test("su encargado no toca los contadores", async () => {
+    const lot = doc(parkingAdmin("encargado"), "parkingLots/e1");
+    await assertFails(updateDoc(lot, { freeSpots: 99 }));
+    await assertFails(updateDoc(lot, { capacity: 99 }));
+    await assertFails(updateDoc(lot, { freeSpotsByType: { STANDARD: 99 } }));
+    await assertFails(updateDoc(lot, { capacityByType: { STANDARD: 99 } }));
+  });
+
+  test("un ADMIN corrige los contadores a mano", () =>
+    assertSucceeds(updateDoc(doc(admin(), "parkingLots/e1"), { freeSpots: 0 })));
 
   test("su encargado no se suma administradores", () =>
     assertFails(updateDoc(doc(parkingAdmin("encargado"), "parkingLots/e1"), { adminUids: ["encargado", "otro"] })));

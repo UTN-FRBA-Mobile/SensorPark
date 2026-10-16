@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="admin_lots_title">Mis estacionamientos</string>
+    <string name="admin_lots_empty">Todavía no administrás ningún estacionamiento. Creá el primero con el botón de abajo.</string>
+    <string name="admin_lots_create">Crear</string>
+
+    <string name="admin_panel_tab_spots">Lugares</string>
+    <string name="admin_panel_tab_today">Hoy</string>
+    <string name="admin_panel_tab_details">Datos</string>
+    <string name="admin_panel_spots_pending">Próximamente: el plano de lugares para agregar, cambiar el tipo o marcar fuera de servicio.</string>
+    <string name="admin_panel_today_pending">Próximamente: la ocupación y las reservas del día.</string>
+    <string name="admin_panel_details_pending">Próximamente: editar nombre, dirección, horario, tolerancia y tarifa.</string>
+
+    <string name="admin_create_title">Crear estacionamiento</string>
+    <string name="admin_create_pending">Próximamente: el formulario de alta. Quien lo crea queda como su administrador.</string>
+</resources>
