@@ -10,10 +10,16 @@ import com.google.firebase.firestore.Source
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.messaging.FirebaseMessaging
 import com.sensorpark.data.firebase.Collections
+import com.sensorpark.domain.model.Coordinates
+import com.sensorpark.domain.model.DataResult
+import com.sensorpark.domain.model.NearbyParkingLot
+import com.sensorpark.domain.usecase.SearchNearbyParkingLotsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -34,9 +40,15 @@ class DiagnosticsViewModel @Inject constructor(
     private val db: FirebaseFirestore,
     private val messaging: FirebaseMessaging,
     private val functions: FirebaseFunctions,
+    searchNearby: SearchNearbyParkingLotsUseCase,
 ) : ViewModel() {
     private val _checks = MutableStateFlow(emptyList<Check>())
     val checks: StateFlow<List<Check>> = _checks.asStateFlow()
+
+    /** Estacionamientos cerca del Obelisco, en vivo: sirve para ver moverse los contadores. */
+    val parkingLots: StateFlow<DataResult<List<NearbyParkingLot>>?> =
+        searchNearby(OBELISK, radiusMeters = 10_000.0)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
         runChecks()
@@ -95,6 +107,7 @@ class DiagnosticsViewModel @Inject constructor(
     }
 
     private companion object {
+        val OBELISK = Coordinates(-34.6037, -58.3816)
         const val TIMEOUT_MS = 15_000L
         const val AUTH = "Auth"
         const val ROLE = "Rol (custom claim)"

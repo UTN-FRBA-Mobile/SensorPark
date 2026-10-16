@@ -1,3 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SensorPark</string>
+
+    <!-- Pestañas -->
+    <string name="tab_search">Buscar</string>
+    <string name="tab_reservations">Mis reservas</string>
+    <string name="tab_parking_lots">Estacionamientos</string>
+    <string name="tab_account">Cuenta</string>
+
+    <!-- Sesión -->
+    <string name="session_preparing">Preparando tu cuenta…</string>
+    <string name="action_sign_out">Cerrar sesión</string>
+
+    <!-- Ingreso y registro -->
+    <string name="sign_in_button">Ingresar</string>
+    <string name="sign_in_create_account">Crear cuenta</string>
+    <string name="sign_up_title">Crear cuenta</string>
+    <string name="sign_up_button">Registrarme</string>
+    <string name="sign_up_have_account">Ya tengo cuenta</string>
+    <string name="field_name">Nombre</string>
+    <string name="field_email">Email</string>
+    <string name="field_password">Contraseña</string>
+    <string name="role_driver">Conductor</string>
+    <string name="role_parking_admin">Administro un estacionamiento</string>
+    <string name="auth_error_weak_password">La contraseña debe tener al menos 6 caracteres.</string>
+    <string name="auth_error_email_in_use">Ya existe una cuenta con ese email.</string>
+    <string name="auth_error_invalid_credentials">Email o contraseña incorrectos.</string>
+    <string name="auth_error_no_connection">Sin respuesta del servidor. Revisá tu conexión.</string>
+    <string name="auth_error_unknown">No se pudo completar la operación. Intentá de nuevo.</string>
+
+    <!-- Categoría de prioridad -->
+    <string name="category_title">Prioridad para estacionar (opcional)</string>
+    <string name="category_standard">Ninguna</string>
+    <string name="category_pregnant">Embarazo</string>
+    <string name="category_reduced_mobility">Movilidad reducida o discapacidad</string>
+
+    <!-- Cuenta -->
+    <string name="account_title">Cuenta</string>
+    <string name="account_role_driver">Conductor</string>
+    <string name="account_role_parking_admin">Administrador de estacionamiento</string>
+    <string name="account_role_admin">Administrador del sistema</string>
+    <string name="account_notifications">Avisos</string>
+    <string name="account_notifications_pending">Próximamente: elegir qué avisos recibir.</string>
+    <string name="account_dev_tools">Herramientas de desarrollo</string>
+    <string name="account_diagnostics">Diagnóstico de configuración</string>
 </resources>

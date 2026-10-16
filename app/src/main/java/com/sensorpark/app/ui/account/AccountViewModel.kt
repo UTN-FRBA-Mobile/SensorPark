@@ -1,4 +1,4 @@
-package com.sensorpark.app.ui.settings
+package com.sensorpark.app.ui.account
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class SettingsViewModel @Inject constructor(
+class AccountViewModel @Inject constructor(
     private val userRepository: UserRepository,
 ) : ViewModel() {
 
@@ -31,6 +31,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     private companion object {
-        const val TAG = "SensorParkSettings"
+        const val TAG = "SensorParkAccount"
     }
 }

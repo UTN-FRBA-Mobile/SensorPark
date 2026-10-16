@@ -11,24 +11,29 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.sensorpark.app.R
 import androidx.compose.ui.semantics.Role
 import com.sensorpark.domain.model.Category
 
 /** Texto que ve el usuario para cada categoría de prioridad. */
-fun Category.label(): String = when (this) {
-    Category.STANDARD -> "Ninguna"
-    Category.PREGNANT -> "Embarazo"
-    Category.REDUCED_MOBILITY -> "Movilidad reducida o discapacidad"
-}
+@Composable
+fun Category.label(): String = stringResource(
+    when (this) {
+        Category.STANDARD -> R.string.category_standard
+        Category.PREGNANT -> R.string.category_pregnant
+        Category.REDUCED_MOBILITY -> R.string.category_reduced_mobility
+    },
+)
 
 /**
- * Selector de la categoría de prioridad del conductor. Se usa en el registro y en Preferencias;
+ * Selector de la categoría de prioridad del conductor. Se usa en el registro y en Cuenta;
  * es de buena fe y elegir una es opcional.
  */
 @Composable
 fun CategorySelector(selected: Category, onSelect: (Category) -> Unit, enabled: Boolean = true) {
     Column(modifier = Modifier.fillMaxWidth().selectableGroup()) {
-        Text("Prioridad para estacionar (opcional)", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.category_title), style = MaterialTheme.typography.titleSmall)
         Category.entries.forEach { category ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,

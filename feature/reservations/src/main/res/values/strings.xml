@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reserve_title">Reservar</string>
+    <string name="reserve_pending">Próximamente: elegir día, hora de llegada y tipo de lugar.</string>
+    <string name="reserve_go_to_my_reservations">Ir a mis reservas</string>
+
+    <string name="my_reservations_title">Mis reservas</string>
+    <string name="my_reservations_pending">Próximamente: la reserva activa con su check-in y check-out, las próximas, las listas de espera y el historial.</string>
+    <string name="my_reservations_highlighted">Abierta desde el aviso de la reserva %1$s.</string>
+    <string name="my_reservations_check_in">Hacer check-in</string>
+</resources>

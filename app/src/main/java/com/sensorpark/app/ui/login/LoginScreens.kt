@@ -25,12 +25,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sensorpark.app.R
 import com.sensorpark.app.ui.profile.CategorySelector
+import com.sensorpark.domain.model.AuthErrorReason
 import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.Role
 
@@ -40,15 +43,15 @@ fun LoginScreen(onSignUp: () -> Unit, vm: AuthViewModel = hiltViewModel()) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
 
-    AuthForm(title = "SensorPark", state = state) {
+    AuthForm(title = stringResource(R.string.app_name), state = state) {
         EmailField(email) { email = it }
         PasswordField(password) { password = it }
         Button(
             onClick = { vm.signIn(email, password) },
             enabled = !state.loading && email.isNotBlank() && password.isNotEmpty(),
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Ingresar") }
-        TextButton(onClick = onSignUp) { Text("Crear cuenta") }
+        ) { Text(stringResource(R.string.sign_in_button)) }
+        TextButton(onClick = onSignUp) { Text(stringResource(R.string.sign_in_create_account)) }
     }
 }
 
@@ -61,11 +64,11 @@ fun SignUpScreen(onBack: () -> Unit, vm: AuthViewModel = hiltViewModel()) {
     var role by rememberSaveable { mutableStateOf(Role.DRIVER) }
     var category by rememberSaveable { mutableStateOf(Category.STANDARD) }
 
-    AuthForm(title = "Crear cuenta", state = state) {
+    AuthForm(title = stringResource(R.string.sign_up_title), state = state) {
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text("Nombre") },
+            label = { Text(stringResource(R.string.field_name)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -82,8 +85,8 @@ fun SignUpScreen(onBack: () -> Unit, vm: AuthViewModel = hiltViewModel()) {
             },
             enabled = !state.loading && name.isNotBlank() && email.isNotBlank() && password.isNotEmpty(),
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Registrarme") }
-        TextButton(onClick = onBack) { Text("Ya tengo cuenta") }
+        ) { Text(stringResource(R.string.sign_up_button)) }
+        TextButton(onClick = onBack) { Text(stringResource(R.string.sign_up_have_account)) }
     }
 }
 
@@ -100,7 +103,7 @@ private fun AuthForm(title: String, state: AuthUiState, fields: @Composable () -
     ) {
         Text(title, style = MaterialTheme.typography.headlineMedium)
         fields()
-        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        state.error?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
     }
 }
 
@@ -108,7 +111,10 @@ private fun AuthForm(title: String, state: AuthUiState, fields: @Composable () -
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RoleSelector(selected: Role, onSelect: (Role) -> Unit) {
-    val options = listOf(Role.DRIVER to "Conductor", Role.PARKING_ADMIN to "Administro un estacionamiento")
+    val options = listOf(
+        Role.DRIVER to stringResource(R.string.role_driver),
+        Role.PARKING_ADMIN to stringResource(R.string.role_parking_admin),
+    )
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
         options.forEachIndexed { index, (role, label) ->
             SegmentedButton(
@@ -125,7 +131,7 @@ private fun EmailField(value: String, onChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text("Email") },
+        label = { Text(stringResource(R.string.field_email)) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
         modifier = Modifier.fillMaxWidth(),
@@ -137,10 +143,21 @@ private fun PasswordField(value: String, onChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text("Contraseña") },
+        label = { Text(stringResource(R.string.field_password)) },
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         modifier = Modifier.fillMaxWidth(),
     )
 }
+
+@Composable
+private fun AuthErrorReason.message(): String = stringResource(
+    when (this) {
+        AuthErrorReason.WEAK_PASSWORD -> R.string.auth_error_weak_password
+        AuthErrorReason.EMAIL_IN_USE -> R.string.auth_error_email_in_use
+        AuthErrorReason.INVALID_CREDENTIALS -> R.string.auth_error_invalid_credentials
+        AuthErrorReason.NO_CONNECTION -> R.string.auth_error_no_connection
+        AuthErrorReason.UNKNOWN -> R.string.auth_error_unknown
+    },
+)
