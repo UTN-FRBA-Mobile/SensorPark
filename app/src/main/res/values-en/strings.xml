@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_search">Search</string>
+    <string name="tab_reservations">My reservations</string>
+    <string name="tab_parking_lots">Parking lots</string>
+    <string name="tab_account">Account</string>
+
+    <string name="session_preparing">Setting up your account…</string>
+    <string name="action_sign_out">Sign out</string>
+
+    <string name="sign_in_button">Sign in</string>
+    <string name="sign_in_create_account">Create account</string>
+    <string name="sign_up_title">Create account</string>
+    <string name="sign_up_button">Sign up</string>
+    <string name="sign_up_have_account">I already have an account</string>
+    <string name="field_name">Name</string>
+    <string name="field_email">Email</string>
+    <string name="field_password">Password</string>
+    <string name="role_driver">Driver</string>
+    <string name="role_parking_admin">I manage a parking lot</string>
+    <string name="auth_error_weak_password">The password must be at least 6 characters long.</string>
+    <string name="auth_error_email_in_use">An account with that email already exists.</string>
+    <string name="auth_error_invalid_credentials">Wrong email or password.</string>
+    <string name="auth_error_no_connection">The server didn\'t respond. Check your connection.</string>
+    <string name="auth_error_unknown">Something went wrong. Please try again.</string>
+
+    <string name="category_title">Parking priority (optional)</string>
+    <string name="category_standard">None</string>
+    <string name="category_pregnant">Pregnancy</string>
+    <string name="category_reduced_mobility">Reduced mobility or disability</string>
+
+    <string name="account_title">Account</string>
+    <string name="account_role_driver">Driver</string>
+    <string name="account_role_parking_admin">Parking lot administrator</string>
+    <string name="account_role_admin">System administrator</string>
+    <string name="account_notifications">Notifications</string>
+    <string name="account_notifications_pending">Coming soon: choose which notifications you get.</string>
+    <string name="account_dev_tools">Developer tools</string>
+    <string name="account_diagnostics">Configuration diagnostics</string>
+</resources>

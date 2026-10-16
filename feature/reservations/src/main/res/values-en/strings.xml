@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reserve_title">Reserve</string>
+    <string name="reserve_pending">Coming soon: choose the day, arrival time and spot type.</string>
+    <string name="reserve_go_to_my_reservations">Go to my reservations</string>
+
+    <string name="my_reservations_title">My reservations</string>
+    <string name="my_reservations_pending">Coming soon: your active reservation with check-in and check-out, upcoming ones, waitlists and history.</string>
+    <string name="my_reservations_highlighted">Opened from the notification for reservation %1$s.</string>
+    <string name="my_reservations_check_in">Check in</string>
+</resources>

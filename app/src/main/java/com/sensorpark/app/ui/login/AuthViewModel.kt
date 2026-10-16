@@ -14,7 +14,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class AuthUiState(val loading: Boolean = false, val error: String? = null)
+/** [error] es el motivo; la pantalla elige el texto según el idioma. */
+data class AuthUiState(val loading: Boolean = false, val error: AuthErrorReason? = null)
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
@@ -40,18 +41,10 @@ class AuthViewModel @Inject constructor(
                 action()
                 AuthUiState()
             } catch (e: AuthException) {
-                AuthUiState(error = messageFor(e.reason))
+                AuthUiState(error = e.reason)
             } catch (e: Exception) {
-                AuthUiState(error = messageFor(AuthErrorReason.UNKNOWN))
+                AuthUiState(error = AuthErrorReason.UNKNOWN)
             }
         }
-    }
-
-    private fun messageFor(reason: AuthErrorReason): String = when (reason) {
-        AuthErrorReason.WEAK_PASSWORD -> "La contraseña debe tener al menos 6 caracteres."
-        AuthErrorReason.EMAIL_IN_USE -> "Ya existe una cuenta con ese email."
-        AuthErrorReason.INVALID_CREDENTIALS -> "Email o contraseña incorrectos."
-        AuthErrorReason.NO_CONNECTION -> "Sin respuesta del servidor. Revisá tu conexión."
-        AuthErrorReason.UNKNOWN -> "No se pudo completar la operación. Intentá de nuevo."
     }
 }

@@ -1,7 +1,8 @@
-// Datos semilla: los mismos estacionamientos, niveles y lugares que usan los datos falsos de la app.
+// Datos semilla: los mismos estacionamientos y lugares que usan los datos falsos de la app.
 // Los ids son fijos, así que se puede cargar varias veces sin duplicar; volver a cargarla
-// deja todos los lugares en FREE.
+// deja todos los lugares en FREE y borra los que no son de la semilla.
 const { FieldValue, GeoPoint } = require("firebase-admin/firestore");
+const { countSpots } = require("./counters");
 
 const PARKING_LOTS = [
   {
@@ -30,26 +31,17 @@ const PARKING_LOTS = [
   },
 ];
 
-// Cada estacionamiento tiene dos niveles de 7 lugares: 42 lugares en total.
-const LEVELS = [
-  { id: "level1", name: "Planta baja", letter: "A" },
-  { id: "level2", name: "Subsuelo", letter: "B" },
-];
+// Cada estacionamiento tiene 14 lugares, numerados del 01 al 14: 42 lugares en total.
 // STANDARD: común. PRIORITY: preferencial. MOTORCYCLE: moto. EV_CHARGING: con carga eléctrica.
-const SPOT_TYPES_PER_LEVEL = ["STANDARD", "STANDARD", "STANDARD", "STANDARD", "PRIORITY", "MOTORCYCLE", "EV_CHARGING"];
+const SPOT_TYPES = [
+  "STANDARD", "STANDARD", "STANDARD", "STANDARD", "STANDARD", "STANDARD", "STANDARD", "STANDARD",
+  "PRIORITY", "PRIORITY", "MOTORCYCLE", "MOTORCYCLE", "EV_CHARGING", "EV_CHARGING",
+];
 
-function spotsOf(level) {
-  return SPOT_TYPES_PER_LEVEL.map((type, i) => {
-    const code = `${level.letter}-${String(i + 1).padStart(2, "0")}`;
-    return { id: code, code, levelId: level.id, type };
-  });
-}
-
-function countByType(spots) {
-  const byType = {};
-  spots.forEach((s) => { byType[s.type] = (byType[s.type] || 0) + 1; });
-  return byType;
-}
+const SPOTS = SPOT_TYPES.map((type, i) => {
+  const code = String(i + 1).padStart(2, "0");
+  return { id: code, code, type };
+});
 
 // Carga la semilla en `db`. Conserva los administradores que ya tuviera cada estacionamiento.
 async function seed(db) {
@@ -58,12 +50,9 @@ async function seed(db) {
   for (const lot of PARKING_LOTS) {
     const ref = db.doc(`parkingLots/${lot.id}`);
     const current = await ref.get();
-    const spots = LEVELS.flatMap(spotsOf);
-
-    const levels = {};
-    LEVELS.forEach((l) => {
-      levels[l.id] = { name: l.name, capacity: SPOT_TYPES_PER_LEVEL.length, freeSpots: SPOT_TYPES_PER_LEVEL.length };
-    });
+    const existing = await ref.collection("spots").get();
+    const spots = SPOTS.map((s) => ({ ...s, status: "FREE" }));
+    const ids = new Set(spots.map((s) => s.id));
 
     const batch = db.batch();
     batch.set(ref, {
@@ -75,17 +64,16 @@ async function seed(db) {
       geofenceRadiusMeters: 300,
       hourlyRate: lot.hourlyRate,
       adminUids: (current.exists && current.get("adminUids")) || [],
-      capacity: spots.length,
-      freeSpots: spots.length,
-      freeSpotsByType: countByType(spots),
-      levels,
+      // La function de contadores los recalcula igual al ver los lugares; se escriben acá para que
+      // el estacionamiento no quede un momento sin ellos.
+      ...countSpots(spots),
     });
+    existing.docs.filter((d) => !ids.has(d.id)).forEach((d) => batch.delete(d.ref));
     spots.forEach((s) => {
       batch.set(ref.collection("spots").doc(s.id), {
         code: s.code,
-        levelId: s.levelId,
         type: s.type,
-        status: "FREE",
+        status: s.status,
         updatedAt: FieldValue.serverTimestamp(),
       });
     });
@@ -96,4 +84,4 @@ async function seed(db) {
   return { parkingLots: PARKING_LOTS.length, spots: loadedSpots };
 }
 
-module.exports = { seed, PARKING_LOTS, LEVELS, SPOT_TYPES_PER_LEVEL };
+module.exports = { seed, PARKING_LOTS, SPOTS };

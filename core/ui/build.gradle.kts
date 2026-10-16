@@ -21,6 +21,9 @@ android {
 }
 
 dependencies {
+    // Para los textos y componentes que muestran modelos de domain (tipos de lugar, errores).
+    implementation(project(":domain"))
+
     // `api`: los módulos que usan core:ui reciben Compose y Material 3 sin volver a declararlos.
     api(platform(libs.compose.bom))
     api(libs.ui)
