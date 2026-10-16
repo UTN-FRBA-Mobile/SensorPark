@@ -1,0 +1,377 @@
+// Reservas y lista de espera: functions invocables y el proceso que corre cada minuto.
+// Las reglas están en reservationRules.js; acá se leen y escriben los documentos, siempre en
+// transacciones, para que dos pedidos simultáneos no tomen el mismo lugar.
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const logger = require("firebase-functions/logger");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+const rules = require("./reservationRules");
+
+const BOOKING_ROLES = ["DRIVER", "ADMIN"];
+
+const MESSAGES = {
+  INVALID_DURATION: "La duración tiene que ser 15 o 30 minutos, o 1, 2, 4 u 8 horas.",
+  IN_THE_PAST: "La hora de llegada ya pasó.",
+  TOO_FAR_AHEAD: `Se puede reservar con hasta ${rules.MAX_ADVANCE_DAYS} días de anticipación.`,
+  OUTSIDE_SCHEDULE: "La franja queda fuera del horario del estacionamiento.",
+  CATEGORY_REQUIRED: "Los lugares preferenciales son para quien declaró una categoría de prioridad.",
+  LIMIT_REACHED: `Ya tenés ${rules.MAX_ACTIVE_RESERVATIONS} reservas activas.`,
+  NO_SPOTS: "No hay lugares disponibles para esa franja.",
+  CANCEL_NOT_ALLOWED: "Sólo se puede cancelar una reserva antes del check-in.",
+  TOO_EARLY: `El check-in se habilita ${rules.EARLY_CHECK_IN_MINUTES} minutos antes de la llegada.`,
+  EXPIRED: "La reserva ya no se puede usar.",
+  TOO_FAR: "Tenés que estar en el estacionamiento para hacer check-in.",
+  INVALID_STATUS: "La reserva no está en uso.",
+  ALREADY_IN_WAITLIST: "Ya estás anotado en la lista de espera para esa franja.",
+};
+
+// Rechazo de negocio: la app lee el motivo en `details.reason`.
+function rejection(reason) {
+  const code = reason === "INVALID_DURATION" ? "invalid-argument" : "failed-precondition";
+  return new HttpsError(code, MESSAGES[reason] || reason, { reason });
+}
+
+function invalid(message) {
+  return new HttpsError("invalid-argument", message);
+}
+
+function requireSignedIn(request) {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión.");
+  return request.auth.uid;
+}
+
+function requireBookingRole(request) {
+  const uid = requireSignedIn(request);
+  if (!BOOKING_ROLES.includes(request.auth.token.role)) {
+    throw new HttpsError("permission-denied", "Sólo un conductor puede reservar.");
+  }
+  return uid;
+}
+
+function requireString(value, name) {
+  if (typeof value !== "string" || value.length === 0) throw invalid(`Falta ${name}.`);
+  return value;
+}
+
+function requireDate(value, name) {
+  const date = new Date(requireString(value, name));
+  if (Number.isNaN(date.getTime())) throw invalid(`${name} tiene que ser una fecha ISO 8601.`);
+  return date;
+}
+
+function requireNumber(value, name) {
+  if (typeof value !== "number" || !Number.isFinite(value)) throw invalid(`Falta ${name}.`);
+  return value;
+}
+
+const toDate = (value) => (value && typeof value.toDate === "function" ? value.toDate() : value);
+
+// Una reserva leída de Firestore, con las fechas como Date.
+function reservationOf(doc) {
+  const data = doc.data();
+  return {
+    ...data,
+    id: doc.id,
+    arrivesAt: toDate(data.arrivesAt),
+    endsAt: toDate(data.endsAt),
+    toleranceUntil: toDate(data.toleranceUntil),
+    checkedInAt: toDate(data.checkedInAt),
+  };
+}
+
+const spotOf = (doc) => ({ id: doc.id, ...doc.data() });
+
+function activeReservationsOfLot(db, lotId) {
+  return db.collection("reservations")
+    .where("parkingLotId", "==", lotId)
+    .where("status", "in", rules.ACTIVE_STATUSES);
+}
+
+async function categoryOf(tx, db, uid) {
+  const user = await tx.get(db.doc(`users/${uid}`));
+  return (user.exists && user.get("category")) || "STANDARD";
+}
+
+// Lee la reserva y verifica que sea del usuario.
+async function ownReservation(tx, db, uid, reservationId) {
+  const ref = db.doc(`reservations/${requireString(reservationId, "reservationId")}`);
+  const doc = await tx.get(ref);
+  if (!doc.exists) throw new HttpsError("not-found", "No existe esa reserva.");
+  const reservation = reservationOf(doc);
+  if (reservation.userId !== uid) throw new HttpsError("permission-denied", "La reserva no es tuya.");
+  return { ref, reservation };
+}
+
+// Deja el lugar de una reserva que termina: FREE, o RESERVED si otra ya está en su ventana de
+// "ahora", y le saca la marca `inUseBy` del check-in. Un lugar fuera de servicio no se toca. Las lecturas tienen que ir antes que las
+// escrituras de la transacción, por eso devuelve la escritura para hacerla después.
+async function prepareSpotRelease(tx, db, reservation, now) {
+  const spotRef = db.doc(`parkingLots/${reservation.parkingLotId}/spots/${reservation.spotId}`);
+  const spot = await tx.get(spotRef);
+  const others = await tx.get(activeReservationsOfLot(db, reservation.parkingLotId)
+    .where("spotId", "==", reservation.spotId));
+  return () => {
+    if (!spot.exists) return;
+    const inUse = spot.get("inUseBy") === reservation.id;
+    if (spot.get("status") === "OUT_OF_SERVICE") {
+      if (inUse) tx.update(spotRef, { inUseBy: FieldValue.delete() });
+      return;
+    }
+    const status = rules.spotStatusAfterRelease(
+      others.docs.filter((d) => d.id !== reservation.id).map(reservationOf), now);
+    if (spot.get("status") !== status || inUse) {
+      tx.update(spotRef, { status, inUseBy: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() });
+    }
+  };
+}
+
+// Crea una reserva. Datos: { parkingLotId, arrivesAt (ISO 8601), durationMinutes, spotType o spotId }.
+exports.createReservation = onCall(async (request) => {
+  const uid = requireBookingRole(request);
+  const data = request.data || {};
+  const lotId = requireString(data.parkingLotId, "parkingLotId");
+  const arrivesAt = requireDate(data.arrivesAt, "arrivesAt");
+  const durationMinutes = requireNumber(data.durationMinutes, "durationMinutes");
+  const spotId = data.spotId === undefined ? null : requireString(data.spotId, "spotId");
+  if (!spotId && !rules.SPOT_TYPES.includes(data.spotType)) throw invalid("Falta spotType o spotId.");
+
+  const db = getFirestore();
+  const now = new Date();
+  const lotRef = db.doc(`parkingLots/${lotId}`);
+
+  return db.runTransaction(async (tx) => {
+    const lot = await tx.get(lotRef);
+    if (!lot.exists) throw new HttpsError("not-found", "No existe ese estacionamiento.");
+    const category = await categoryOf(tx, db, uid);
+    const spots = (await tx.get(lotRef.collection("spots"))).docs.map(spotOf);
+    const lotReservations = (await tx.get(activeReservationsOfLot(db, lotId))).docs.map(reservationOf);
+    const userActive = await tx.get(db.collection("reservations")
+      .where("userId", "==", uid).where("status", "in", rules.ACTIVE_STATUSES));
+
+    let spotType = data.spotType;
+    if (spotId) {
+      const requested = spots.find((s) => s.id === spotId);
+      if (!requested) throw new HttpsError("not-found", "No existe ese lugar.");
+      spotType = requested.type;
+    }
+
+    const problem = rules.requestProblem({
+      arrivesAt, durationMinutes, spotType, category,
+      activeReservations: userActive.size, schedule: lot.get("schedule"),
+    }, now);
+    if (problem) throw rejection(problem);
+
+    const endsAt = rules.endsAt(arrivesAt, durationMinutes);
+    const spot = rules.pickSpot(spots, {
+      spotType, spotId, category, arrivesAt, endsAt, reservations: lotReservations,
+    }, now);
+    if (!spot) throw rejection("NO_SPOTS");
+
+    const toleranceUntil = rules.toleranceUntil(arrivesAt, lot.get("toleranceMinutes"));
+    const ref = db.collection("reservations").doc();
+    tx.set(ref, {
+      userId: uid,
+      parkingLotId: lotId,
+      spotId: spot.id,
+      spotCode: spot.code,
+      spotType: spot.type,
+      arrivesAt: Timestamp.fromDate(arrivesAt),
+      durationMinutes,
+      endsAt: Timestamp.fromDate(endsAt),
+      toleranceUntil: Timestamp.fromDate(toleranceUntil),
+      status: "CONFIRMED",
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    // Siempre se escribe el lugar elegido: si otro pedido simultáneo leyó los mismos lugares,
+    // su transacción choca con ésta, se reintenta y ve la reserva nueva.
+    const spotUpdate = { lastReservationAt: FieldValue.serverTimestamp() };
+    if (rules.isInNowWindow(arrivesAt, now)) {
+      spotUpdate.status = "RESERVED";
+      spotUpdate.updatedAt = FieldValue.serverTimestamp();
+    }
+    tx.update(lotRef.collection("spots").doc(spot.id), spotUpdate);
+
+    logger.info("Reserva creada", { reservationId: ref.id, uid, lotId, spotId: spot.id });
+    return {
+      reservationId: ref.id,
+      spotId: spot.id,
+      spotCode: spot.code,
+      arrivesAt: arrivesAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+      toleranceUntil: toleranceUntil.toISOString(),
+    };
+  });
+});
+
+// Cancela una reserva propia antes del check-in. Datos: { reservationId }.
+exports.cancelReservation = onCall(async (request) => {
+  const uid = requireSignedIn(request);
+  const db = getFirestore();
+  const now = new Date();
+  return db.runTransaction(async (tx) => {
+    const { ref, reservation } = await ownReservation(tx, db, uid, (request.data || {}).reservationId);
+    if (!rules.canCancel(reservation)) throw rejection("CANCEL_NOT_ALLOWED");
+    const release = await prepareSpotRelease(tx, db, reservation, now);
+    tx.update(ref, { status: "CANCELLED", cancelledAt: FieldValue.serverTimestamp() });
+    release();
+    return { status: "CANCELLED" };
+  });
+});
+
+// Confirma la llegada. Datos: { reservationId, latitude, longitude }.
+exports.checkIn = onCall(async (request) => {
+  const uid = requireSignedIn(request);
+  const data = request.data || {};
+  const position = {
+    latitude: requireNumber(data.latitude, "latitude"),
+    longitude: requireNumber(data.longitude, "longitude"),
+  };
+  const db = getFirestore();
+  const now = new Date();
+  return db.runTransaction(async (tx) => {
+    const { ref, reservation } = await ownReservation(tx, db, uid, data.reservationId);
+    const lot = await tx.get(db.doc(`parkingLots/${reservation.parkingLotId}`));
+    if (!lot.exists) throw new HttpsError("not-found", "No existe ese estacionamiento.");
+    const location = lot.get("location");
+    const distance = rules.distanceMeters(position,
+      { latitude: location.latitude, longitude: location.longitude });
+    const problem = rules.checkInProblem(reservation,
+      { distance, radiusMeters: lot.get("geofenceRadiusMeters") || 0 }, now);
+    if (problem) throw rejection(problem);
+
+    tx.update(ref, { status: "IN_USE", checkedInAt: Timestamp.fromDate(now) });
+    // `inUseBy` marca que el auto está por una reserva: el simulador de sensores no lo libera.
+    tx.update(db.doc(`parkingLots/${reservation.parkingLotId}/spots/${reservation.spotId}`),
+      { status: "OCCUPIED", inUseBy: reservation.id, updatedAt: FieldValue.serverTimestamp() });
+    return { status: "IN_USE" };
+  });
+});
+
+// Cierra la estadía. Datos: { reservationId }.
+exports.checkOut = onCall(async (request) => {
+  const uid = requireSignedIn(request);
+  const db = getFirestore();
+  const now = new Date();
+  return db.runTransaction(async (tx) => {
+    const { ref, reservation } = await ownReservation(tx, db, uid, (request.data || {}).reservationId);
+    if (reservation.status !== "IN_USE") throw rejection("INVALID_STATUS");
+    const lot = await tx.get(db.doc(`parkingLots/${reservation.parkingLotId}`));
+    const release = await prepareSpotRelease(tx, db, reservation, now);
+    const summary = rules.checkoutSummary(reservation.checkedInAt, lot.get("hourlyRate"), now);
+    tx.update(ref, { status: "FINISHED", checkedOutAt: Timestamp.fromDate(now), ...summary });
+    release();
+    return { status: "FINISHED", ...summary };
+  });
+});
+
+// Anota al usuario en la lista de espera. Datos: { parkingLotId, arrivesAt, durationMinutes, spotType }.
+exports.joinWaitlist = onCall(async (request) => {
+  const uid = requireBookingRole(request);
+  const data = request.data || {};
+  const lotId = requireString(data.parkingLotId, "parkingLotId");
+  const arrivesAt = requireDate(data.arrivesAt, "arrivesAt");
+  const durationMinutes = requireNumber(data.durationMinutes, "durationMinutes");
+  if (!rules.SPOT_TYPES.includes(data.spotType)) throw invalid("Falta spotType.");
+
+  const db = getFirestore();
+  const now = new Date();
+  return db.runTransaction(async (tx) => {
+    const lot = await tx.get(db.doc(`parkingLots/${lotId}`));
+    if (!lot.exists) throw new HttpsError("not-found", "No existe ese estacionamiento.");
+    const category = await categoryOf(tx, db, uid);
+    // Los mismos pasos 1 a 5 que al reservar; el límite de reservas activas no aplica.
+    const problem = rules.requestProblem({
+      arrivesAt, durationMinutes, spotType: data.spotType, category,
+      activeReservations: 0, schedule: lot.get("schedule"),
+    }, now);
+    if (problem) throw rejection(problem);
+
+    const waiting = (await tx.get(db.collection("waitlist")
+      .where("parkingLotId", "==", lotId).where("status", "==", "WAITING"))).docs
+      .map((d) => ({ ...d.data(), arrivesAt: toDate(d.get("arrivesAt")), requestedAt: toDate(d.get("requestedAt")) }));
+    const sameSlot = (e) => e.arrivesAt.getTime() === arrivesAt.getTime() && e.durationMinutes === durationMinutes;
+    if (waiting.some((e) => e.userId === uid && sameSlot(e))) throw rejection("ALREADY_IN_WAITLIST");
+
+    const requestedAt = new Date();
+    const entry = {
+      userId: uid,
+      parkingLotId: lotId,
+      spotType: data.spotType,
+      arrivesAt: Timestamp.fromDate(arrivesAt),
+      durationMinutes,
+      endsAt: Timestamp.fromDate(rules.endsAt(arrivesAt, durationMinutes)),
+      category,
+      requestedAt: Timestamp.fromDate(requestedAt),
+      status: "WAITING",
+    };
+    const ref = db.collection("waitlist").doc();
+    tx.set(ref, entry);
+    // La posición es entre quienes esperan la misma franja y el mismo tipo de lugar.
+    const queue = [...waiting.filter((e) => sameSlot(e) && e.spotType === data.spotType),
+      { category, requestedAt, userId: uid }]
+      .sort(rules.waitlistCompare);
+    return { entryId: ref.id, position: queue.findIndex((e) => e.userId === uid) + 1 };
+  });
+});
+
+// Saca al usuario de la lista de espera. Datos: { entryId }.
+exports.leaveWaitlist = onCall(async (request) => {
+  const uid = requireSignedIn(request);
+  const db = getFirestore();
+  const ref = db.doc(`waitlist/${requireString((request.data || {}).entryId, "entryId")}`);
+  return db.runTransaction(async (tx) => {
+    const entry = await tx.get(ref);
+    if (!entry.exists) throw new HttpsError("not-found", "No existe esa entrada.");
+    if (entry.get("userId") !== uid) throw new HttpsError("permission-denied", "La entrada no es tuya.");
+    tx.update(ref, { status: "LEFT" });
+    return { status: "LEFT" };
+  });
+});
+
+// Lo que hace el proceso de cada minuto, con la hora como parámetro para poder probarlo:
+// vence las reservas sin check-in y reserva los lugares de las que entraron en su ventana de "ahora".
+// Es idempotente: correrlo dos veces seguidas no cambia nada la segunda vez.
+async function processReservationsAt(db, now) {
+  let expired = 0;
+  let reserved = 0;
+
+  const overdue = await db.collection("reservations")
+    .where("status", "==", "CONFIRMED")
+    .where("toleranceUntil", "<", Timestamp.fromDate(now)).get();
+  for (const doc of overdue.docs) {
+    await db.runTransaction(async (tx) => {
+      const current = await tx.get(doc.ref);
+      const reservation = reservationOf(current);
+      if (!rules.isExpired(reservation, now)) return;
+      const release = await prepareSpotRelease(tx, db, reservation, now);
+      tx.update(doc.ref, { status: "EXPIRED", expiredAt: FieldValue.serverTimestamp() });
+      release();
+      expired++;
+    });
+  }
+
+  const windowEnd = new Date(now.getTime() + rules.NOW_WINDOW_MINUTES * 60 * 1000);
+  const upcoming = await db.collection("reservations")
+    .where("status", "==", "CONFIRMED")
+    .where("arrivesAt", "<=", Timestamp.fromDate(windowEnd)).get();
+  for (const doc of upcoming.docs) {
+    const reservation = reservationOf(doc);
+    if (rules.isExpired(reservation, now)) continue;
+    const spotRef = db.doc(`parkingLots/${reservation.parkingLotId}/spots/${reservation.spotId}`);
+    await db.runTransaction(async (tx) => {
+      const spot = await tx.get(spotRef);
+      if (!spot.exists || spot.get("status") !== "FREE") return;
+      tx.update(spotRef, { status: "RESERVED", updatedAt: FieldValue.serverTimestamp() });
+      reserved++;
+    });
+  }
+
+  return { expired, reserved };
+}
+
+exports.processReservations = onSchedule("every 1 minutes", async () => {
+  const result = await processReservationsAt(getFirestore(), new Date());
+  logger.info("Proceso de reservas", result);
+});
+
+exports.processReservationsAt = processReservationsAt;

@@ -8,8 +8,6 @@ object Collections {
     /** Subcolección de cada estacionamiento: sus lugares. */
     const val SPOTS = "spots"
 
-    /** Subcolección de cada estacionamiento: cupos por categoría. El id del documento es la fecha (AAAA-MM-DD). */
-    const val QUOTAS = "quotas"
     const val RESERVATIONS = "reservations"
     const val WAITLIST = "waitlist"
 }
@@ -53,5 +51,36 @@ object SpotFields {
     const val CODE = "code"
     const val TYPE = "type"
     const val STATUS = "status"
+
+    /** Sólo en lugares PRIORITY: la categoría que puede usarlo. */
+    const val PRIORITY_CATEGORY = "priorityCategory"
     const val UPDATED_AT = "updatedAt"
+}
+
+/** Campos de `reservations/{id}`. Las escriben sólo las functions; ver docs/reservation-rules.md. */
+object ReservationFields {
+    const val USER_ID = "userId"
+    const val PARKING_LOT_ID = "parkingLotId"
+    const val SPOT_ID = "spotId"
+    const val SPOT_CODE = "spotCode"
+    const val SPOT_TYPE = "spotType"
+    const val ARRIVES_AT = "arrivesAt"
+    const val DURATION_MINUTES = "durationMinutes"
+    const val ENDS_AT = "endsAt"
+    const val TOLERANCE_UNTIL = "toleranceUntil"
+    const val STATUS = "status"
+    const val CHECKED_IN_AT = "checkedInAt"
+    const val CHECKED_OUT_AT = "checkedOutAt"
+    const val STAY_MINUTES = "stayMinutes"
+    const val AMOUNT = "amount"
+}
+
+/** Cloud Functions invocables de reservas, en functions/reservations.js. */
+object ReservationFunctions {
+    const val CREATE = "createReservation"
+    const val CANCEL = "cancelReservation"
+    const val CHECK_IN = "checkIn"
+    const val CHECK_OUT = "checkOut"
+    const val JOIN_WAITLIST = "joinWaitlist"
+    const val LEAVE_WAITLIST = "leaveWaitlist"
 }

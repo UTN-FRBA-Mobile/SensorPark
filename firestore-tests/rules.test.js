@@ -27,7 +27,6 @@ beforeEach(async () => {
       name: "Playa Centro", adminUids: ["encargado"], capacity: 1, freeSpots: 1,
     });
     await setDoc(doc(db, "parkingLots/e1/spots/A-01"), { code: "A-01", status: "FREE" });
-    await setDoc(doc(db, "parkingLots/e1/quotas/2026-11-02"), { PREGNANT: 10 });
     await setDoc(doc(db, "reservations/r1"), { userId: "ana", parkingLotId: "e1", spotId: "A-01" });
     await setDoc(doc(db, "waitlist/w1"), { userId: "ana", parkingLotId: "e1" });
   });
@@ -142,7 +141,7 @@ describe("estacionamientos", () => {
     assertFails(updateDoc(doc(parkingAdmin("otro"), "parkingLots/e1"), { name: "Nuevo" })));
 });
 
-describe("lugares y cupos", () => {
+describe("lugares", () => {
   test("cualquier autenticado ve la ocupación", () =>
     assertSucceeds(getDoc(doc(driver("ana"), "parkingLots/e1/spots/A-01"))));
 
@@ -160,14 +159,10 @@ describe("lugares y cupos", () => {
     assertFails(updateDoc(
       doc(parkingAdmin("otro"), "parkingLots/e1/spots/A-01"), { status: "OUT_OF_SERVICE" })));
 
-  test("cualquier autenticado lee los cupos", () =>
-    assertSucceeds(getDoc(doc(driver("ana"), "parkingLots/e1/quotas/2026-11-02"))));
-
-  test("su encargado define los cupos de una fecha", () =>
-    assertSucceeds(setDoc(doc(parkingAdmin("encargado"), "parkingLots/e1/quotas/2026-11-03"), { PREGNANT: 20 })));
-
-  test("un conductor no define cupos", () =>
-    assertFails(setDoc(doc(driver("ana"), "parkingLots/e1/quotas/2026-11-03"), { PREGNANT: 20 })));
+  test("ya no hay cupos por fecha: nadie los lee ni los escribe", async () => {
+    await assertFails(getDoc(doc(driver("ana"), "parkingLots/e1/quotas/2026-11-02")));
+    await assertFails(setDoc(doc(parkingAdmin("encargado"), "parkingLots/e1/quotas/2026-11-03"), { PREGNANT: 20 }));
+  });
 });
 
 describe("reservas", () => {
@@ -190,7 +185,13 @@ describe("reservas", () => {
 
   test("el conductor no modifica ni borra su reserva directo", async () => {
     await assertFails(updateDoc(doc(driver("ana"), "reservations/r1"), { status: "IN_USE" }));
+    await assertFails(updateDoc(doc(driver("ana"), "reservations/r1"), { status: "CANCELLED" }));
     await assertFails(deleteDoc(doc(driver("ana"), "reservations/r1")));
+  });
+
+  test("el encargado tampoco escribe reservas", async () => {
+    await assertFails(updateDoc(doc(parkingAdmin("encargado"), "reservations/r1"), { status: "EXPIRED" }));
+    await assertFails(setDoc(doc(parkingAdmin("encargado"), "reservations/r3"), { userId: "ana", parkingLotId: "e1" }));
   });
 });
 
@@ -203,4 +204,9 @@ describe("lista de espera", () => {
 
   test("nadie se anota escribiendo directo", () =>
     assertFails(setDoc(doc(driver("ana"), "waitlist/w2"), { userId: "ana" })));
+
+  test("el usuario no modifica ni borra su entrada directo", async () => {
+    await assertFails(updateDoc(doc(driver("ana"), "waitlist/w1"), { status: "LEFT" }));
+    await assertFails(deleteDoc(doc(driver("ana"), "waitlist/w1")));
+  });
 });
