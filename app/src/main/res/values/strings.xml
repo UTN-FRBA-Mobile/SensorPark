@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- La versión en inglés está en values-en. -->
 <resources>
     <string name="app_name">SensorPark</string>
 

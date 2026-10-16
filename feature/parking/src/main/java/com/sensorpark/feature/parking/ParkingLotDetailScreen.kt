@@ -107,7 +107,7 @@ private fun Info(lot: ParkingLot) {
             add(stringResource(R.string.detail_tolerance) to stringResource(R.string.detail_tolerance_value, lot.toleranceMinutes))
         }
         if (lot.hourlyRate > 0) {
-            // La tarifa está en pesos: se muestra siempre como pesos argentinos, sea cual sea el idioma.
+            // La tarifa está en pesos argentinos.
             val pesoFormat = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-AR")).apply { maximumFractionDigits = 0 }
             add(stringResource(R.string.detail_rate) to stringResource(R.string.detail_rate_value, pesoFormat.format(lot.hourlyRate)))
         }

@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="nearby_title">Nearby parking</string>
-    <string name="nearby_subtitle">Within %1$s of %2$s</string>
-    <string name="nearby_empty">No parking lots match those filters.</string>
-    <string name="nearby_filter_free">With free spots</string>
-    <string name="nearby_free_of_type">%1$s: %2$d of %3$d free</string>
-</resources>
