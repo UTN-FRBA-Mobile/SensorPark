@@ -35,4 +35,5 @@ dependencies {
 
     debugImplementation(libs.ui.tooling)
     testImplementation(libs.junit)
+    testImplementation(libs.coroutines.test)
 }
