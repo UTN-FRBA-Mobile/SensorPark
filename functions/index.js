@@ -10,6 +10,7 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 const { seed } = require("./seed");
 const { affectsCounters, recountParkingLot } = require("./counters");
+const simulator = require("./simulator");
 
 // Tiene que ser la misma región que se eligió al crear la base de Firestore.
 setGlobalOptions({ region: "southamerica-east1", maxInstances: 5 });
@@ -152,30 +153,10 @@ exports.sendTestPush = onCall(async (request) => {
   return { sent };
 });
 
-// Simulador de sensores mínimo: cada corrida cambia algunos lugares entre FREE y OCCUPIED.
-// Los RESERVED, OUT_OF_SERVICE y los ocupados por una reserva en uso no se tocan. Los contadores
-// los actualiza updateFreeSpotCounters.
-// Se pausa desde Cloud Scheduler en la consola de Google Cloud.
-const SPOTS_PER_RUN = 50;
-const CHANGE_PROBABILITY = 0.2;
-
-exports.simulateSensors = onSchedule("every 5 minutes", async () => {
-  const spots = await db.collectionGroup("spots").limit(SPOTS_PER_RUN).get();
-  const batch = db.batch();
-  let changes = 0;
-
-  spots.forEach((spot) => {
-    const status = spot.get("status");
-    // Un lugar con un auto que hizo check-in (`inUseBy`) lo libera el check-out, no el sensor.
-    const movedBySensor = (status === "FREE" || status === "OCCUPIED") && !spot.get("inUseBy");
-    if (!movedBySensor || Math.random() > CHANGE_PROBABILITY) return;
-    batch.update(spot.ref, {
-      status: status === "OCCUPIED" ? "FREE" : "OCCUPIED",
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    changes++;
-  });
-
-  if (changes > 0) await batch.commit();
-  logger.info("Simulación de sensores", { checked: spots.size, changes });
-});
+// Simulador de sensores (ver simulator.js). Corre cada minuto y reparte los cambios a lo largo de
+// ese minuto, según el escenario, el intervalo y la pausa de `config/simulator`. Sin ese documento
+// queda en pausa. Los contadores los actualiza updateFreeSpotCounters.
+exports.simulateSensors = onSchedule(
+  { schedule: "every 1 minutes", timeoutSeconds: 90 },
+  () => simulator.runSimulation(db),
+);

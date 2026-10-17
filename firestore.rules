@@ -77,5 +77,12 @@ service cloud.firestore {
     match /waitlist/{entryId} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
+
+    // Control del simulador de sensores (`config/simulator`: escenario, intervalo y pausa). Es una
+    // herramienta de desarrollo: sólo la lee y la escribe un ADMIN. La function que simula usa el
+    // Admin SDK y no pasa por estas reglas.
+    match /config/{docId} {
+      allow read, write: if isAdmin();
+    }
   }
 }
