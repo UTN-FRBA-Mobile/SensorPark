@@ -4,11 +4,13 @@ import com.sensorpark.data.firebase.AuthRepositoryFirebase
 import com.sensorpark.data.firebase.DeviceRepositoryFirebase
 import com.sensorpark.data.firebase.ParkingLotRepositoryFirebase
 import com.sensorpark.data.firebase.ReservationRepositoryFirebase
+import com.sensorpark.data.firebase.SpotAvailabilityRepositoryFirebase
 import com.sensorpark.data.firebase.UserRepositoryFirebase
 import com.sensorpark.domain.repository.AuthRepository
 import com.sensorpark.domain.repository.DeviceRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
 import com.sensorpark.domain.repository.ReservationRepository
+import com.sensorpark.domain.repository.SpotAvailabilityRepository
 import com.sensorpark.domain.repository.UserRepository
 import dagger.Binds
 import dagger.Module
@@ -38,6 +40,10 @@ abstract class RepositoriesModule {
     @Binds
     @Singleton
     abstract fun parkingLotRepository(impl: ParkingLotRepositoryFirebase): ParkingLotRepository
+
+    @Binds
+    @Singleton
+    abstract fun spotAvailabilityRepository(impl: SpotAvailabilityRepositoryFirebase): SpotAvailabilityRepository
 
     @Binds
     @Singleton

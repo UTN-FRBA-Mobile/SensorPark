@@ -31,6 +31,9 @@ import com.sensorpark.domain.model.DataResult
 import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.model.SpotType
 import java.text.NumberFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
@@ -42,21 +45,27 @@ fun ParkingLotDetailScreen(
     parkingLotId: String,
     onReserve: (parkingLotId: String) -> Unit,
     vm: ParkingLotDetailViewModel = hiltViewModel(),
+    spotsVm: SpotAvailabilityViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(parkingLotId) { vm.load(parkingLotId) }
+    LaunchedEffect(parkingLotId) {
+        vm.load(parkingLotId)
+        spotsVm.load(parkingLotId)
+    }
     val result by vm.result.collectAsStateWithLifecycle()
+    // El listener de los lugares vive sólo mientras la pantalla está visible.
+    val spots by spotsVm.state.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
         when (val current = result) {
             null -> LoadingContent()
             is DataResult.Failure -> ErrorContent(current.reason, onRetry = vm::retry)
-            is DataResult.Success -> Detail(current.value, onReserve = { onReserve(parkingLotId) })
+            is DataResult.Success -> Detail(current.value, spots, onReserve = { onReserve(parkingLotId) })
         }
     }
 }
 
 @Composable
-private fun Detail(lot: ParkingLot, onReserve: () -> Unit) {
+private fun Detail(lot: ParkingLot, spots: SpotAvailabilityState, onReserve: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -64,6 +73,7 @@ private fun Detail(lot: ParkingLot, onReserve: () -> Unit) {
         Column {
             Text(lot.name, style = MaterialTheme.typography.headlineSmall)
             Text(lot.address, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ConnectionStatus(spots)
         }
 
         Card(Modifier.fillMaxWidth()) {
@@ -93,6 +103,30 @@ private fun Detail(lot: ParkingLot, onReserve: () -> Unit) {
         }
     }
 }
+
+/** "En vivo" con datos del servidor, o "Sin conexión" con la hora de los últimos datos recibidos. */
+@Composable
+private fun ConnectionStatus(state: SpotAvailabilityState) {
+    val (text, color) = when (state) {
+        is SpotAvailabilityState.Live -> stringResource(R.string.spots_live) to MaterialTheme.colorScheme.primary
+        is SpotAvailabilityState.Offline -> {
+            val time = state.lastUpdate?.let(::formatTime)
+            val label = if (time == null) {
+                stringResource(R.string.spots_offline)
+            } else {
+                stringResource(R.string.spots_offline_since, time)
+            }
+            label to MaterialTheme.colorScheme.error
+        }
+        // Mientras carga, o si falla sólo la lectura de los lugares, los datos del resumen siguen valiendo.
+        else -> return
+    }
+    Text(text, style = MaterialTheme.typography.labelMedium, color = color)
+}
+
+private val timeFormat = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
+
+private fun formatTime(instant: Instant): String = timeFormat.format(instant)
 
 @Composable
 private fun Info(lot: ParkingLot) {
