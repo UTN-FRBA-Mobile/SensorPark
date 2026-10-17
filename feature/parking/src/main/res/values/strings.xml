@@ -10,4 +10,7 @@
     <string name="detail_by_type">Por tipo de lugar</string>
     <string name="detail_reserve">Reservar un lugar</string>
     <string name="detail_no_free_spots">Sin lugares libres</string>
+    <string name="spots_live">En vivo</string>
+    <string name="spots_offline">Sin conexión</string>
+    <string name="spots_offline_since">Sin conexión · datos de las %1$s</string>
 </resources>
