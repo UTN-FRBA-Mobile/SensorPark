@@ -210,3 +210,29 @@ describe("lista de espera", () => {
     await assertFails(deleteDoc(doc(driver("ana"), "waitlist/w1")));
   });
 });
+
+describe("configuración del simulador", () => {
+  const config = { scenario: "NORMAL", intervalSeconds: 10, paused: true };
+
+  test("un ADMIN la escribe y la lee", async () => {
+    await assertSucceeds(setDoc(doc(admin(), "config/simulator"), config));
+    await assertSucceeds(getDoc(doc(admin(), "config/simulator")));
+  });
+
+  test("un ADMIN la modifica", async () => {
+    await assertSucceeds(setDoc(doc(admin(), "config/simulator"), config));
+    await assertSucceeds(updateDoc(doc(admin(), "config/simulator"), { paused: false }));
+  });
+
+  test("ni el conductor ni el encargado la leen ni la escriben", async () => {
+    await testEnv.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "config/simulator"), config));
+    for (const db of [driver("ana"), parkingAdmin("encargado")]) {
+      await assertFails(getDoc(doc(db, "config/simulator")));
+      await assertFails(updateDoc(doc(db, "config/simulator"), { paused: false }));
+      await assertFails(setDoc(doc(db, "config/simulator"), config));
+    }
+  });
+
+  test("sin sesión tampoco", () =>
+    assertFails(getDoc(doc(anonymous(), "config/simulator"))));
+});
