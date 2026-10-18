@@ -115,9 +115,12 @@ private fun MainNavigation(state: SessionState.SignedIn, role: Role, onSignOut: 
         bottomBar = {
             NavigationBar {
                 tabs.forEach { tab ->
+                    val selected = destination?.hierarchy?.any { it.route == tab.graph } == true
                     NavigationBarItem(
-                        selected = destination?.hierarchy?.any { it.route == tab.graph } == true,
-                        onClick = { nav.navigateToTab(tab) },
+                        selected = selected,
+                        // Volver a tocar la pestaña en la que se está lleva a su inicio, como en
+                        // cualquier app: si no, desde el check-in no había forma de llegar a la lista.
+                        onClick = { if (selected) nav.goToTabStart(tab) else nav.navigateToTab(tab) },
                         icon = { Icon(tab.icon, contentDescription = null) },
                         label = { Text(stringResource(tab.label)) },
                     )
@@ -150,6 +153,25 @@ private fun NavHostController.navigateToTab(tab: Tab) {
     }
 }
 
+/** Abre una pestaña en su inicio, olvidando la pila que había quedado guardada. */
+private fun NavHostController.openTabAtStart(tab: Tab) {
+    clearBackStack(tab.graph)
+    navigate(tab.graph) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+    }
+}
+
+/**
+ * Lleva al inicio de la pestaña actual. Si el inicio no está en la pila (se llegó por un deep link
+ * directo a una pantalla interna), lo abre.
+ */
+private fun NavHostController.goToTabStart(tab: Tab) {
+    if (!popBackStack(tab.start.pattern, inclusive = false)) {
+        navigate(tab.start.pattern.substringBefore("?")) { launchSingleTop = true }
+    }
+}
+
 private fun NavGraphBuilder.searchTab(nav: NavHostController) {
     navigation(startDestination = Tab.SEARCH.start.pattern, route = Tab.SEARCH.graph) {
         composable(Route.Map.pattern) {
@@ -164,7 +186,9 @@ private fun NavGraphBuilder.searchTab(nav: NavHostController) {
         composable(Route.Reserve.pattern) { entry ->
             ReserveScreen(
                 parkingLotId = entry.arguments?.getString(Route.ARG_PARKING_LOT_ID).orEmpty(),
-                onOpenMyReservations = { nav.navigateToTab(Tab.RESERVATIONS) },
+                // A la lista, donde está la reserva nueva: no a la pantalla que había quedado
+                // abierta en esa pestaña (por ejemplo el resumen de una reserva anterior).
+                onOpenMyReservations = { nav.openTabAtStart(Tab.RESERVATIONS) },
             )
         }
     }

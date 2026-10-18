@@ -7,6 +7,7 @@ import com.sensorpark.data.notifications.InAppNotifications
 import com.sensorpark.data.preferences.PermissionPromptStore
 import com.sensorpark.domain.model.AppNotification
 import com.sensorpark.domain.model.DataResult
+import com.sensorpark.domain.repository.GeofenceRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
 import com.sensorpark.domain.repository.ReservationRepository
 import com.sensorpark.domain.usecase.SyncReservationAlertsUseCase
@@ -34,9 +35,15 @@ class AlertsViewModel @Inject constructor(
     private val reservations: ReservationRepository,
     private val parkingLots: ParkingLotRepository,
     private val syncAlerts: SyncReservationAlertsUseCase,
+    private val geofences: GeofenceRepository,
     private val permissionPrompts: PermissionPromptStore,
     inAppNotifications: InAppNotifications,
 ) : ViewModel() {
+
+    init {
+        // Por si el permiso de segundo plano se dio desde los ajustes, con la app cerrada.
+        registerPendingGeofences()
+    }
 
     val banners: Flow<AppNotification> = inAppNotifications.messages
 
@@ -55,6 +62,21 @@ class AlertsViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { permissionPrompts.markAskedAfterFirstReservation() }
                 .onFailure { Log.w(TAG, "No se pudo recordar que ya se pidieron los permisos", it) }
+        }
+        registerPendingGeofences()
+    }
+
+    /**
+     * Los permisos se piden después de la primera reserva, así que su geocerca se guardó cuando
+     * todavía no se podía registrar en el sistema. Sin esto, la primera reserva (justo la de la
+     * demo) nunca tendría aviso de llegada. Volver a registrarlas es idempotente: las que ya
+     * estaban se reemplazan y las vencidas se borran.
+     */
+    private fun registerPendingGeofences() {
+        viewModelScope.launch {
+            if (!geofences.hasBackgroundLocationPermission()) return@launch
+            runCatching { geofences.restoreAll() }
+                .onFailure { Log.w(TAG, "No se pudieron registrar las geocercas pendientes", it) }
         }
     }
 
