@@ -1,10 +1,13 @@
 package com.sensorpark.feature.reservations
 
 import android.os.ParcelFileDescriptor
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeReservationRepository
@@ -45,13 +48,13 @@ class ReservationScreensUiTest {
             createReservation = CreateReservationUseCase(reservations, clock),
             clock = clock,
         )
-        compose.mainClock.autoAdvance = false
+        // Esta pantalla no tiene cuenta regresiva, así que el reloj automático de Compose
+        // sincroniza solo: no hace falta pedir frames a mano.
         compose.setContent {
-            SensorParkTheme {
+            SensorParkTheme(dynamicColor = false) {
                 ReserveScreen(parkingLotId = Samples.UTN_MEDRANO.id, onOpenMyReservations = {}, vm = vm)
             }
         }
-        compose.settle()
 
         // El formulario muestra el estacionamiento, la franja y la tarifa estimada.
         compose.onNodeWithText("Reservar").assertExists()
@@ -61,13 +64,15 @@ class ReservationScreensUiTest {
         compose.screenshot("01-reservar")
 
         // Elegir dos horas cambia la tarifa estimada.
-        compose.onNodeWithText("2 h").performClick()
-        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("2 h").performScrollTo().performClick()
         compose.onNodeWithText("Tarifa estimada: $2.400").assertExists()
 
-        // Confirmar lleva al resumen con el lugar asignado y la tolerancia.
-        compose.onNodeWithText("Confirmar reserva").performClick()
-        compose.mainClock.advanceTimeByFrame()
+        // Confirmar lleva al resumen con el lugar asignado y la tolerancia. El botón está al final
+        // del formulario, así que hay que bajar hasta él: un click fuera de la pantalla no hace nada.
+        compose.onNodeWithText("Confirmar reserva").performScrollTo().performClick()
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithText("¡Listo, reservaste!").fetchSemanticsNodes().isNotEmpty()
+        }
 
         compose.onNodeWithText("¡Listo, reservaste!").assertExists()
         compose.onNodeWithText("Lugar 07").assertExists()
@@ -81,12 +86,12 @@ class ReservationScreensUiTest {
         val vm = myReservationsViewModel()
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SensorParkTheme { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
+            SensorParkTheme(dynamicColor = false) { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
         }
         compose.settle()
 
-        compose.onNodeWithText("Mis reservas").assertExists()
-        compose.onNodeWithText("Ahora").assertExists()
+        compose.onNodeWithText("Mis reservas").assertIsDisplayed()
+        compose.onNodeWithText("Ahora").assertIsDisplayed()
         compose.onNodeWithText("UTN Medrano").assertExists()
         compose.onNodeWithText("Confirmada").assertExists()
         compose.onNodeWithText("para hacer el check-in", substring = true).assertExists()
@@ -100,11 +105,11 @@ class ReservationScreensUiTest {
         val vm = myReservationsViewModel()
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SensorParkTheme { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
+            SensorParkTheme(dynamicColor = false) { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
         }
         compose.settle()
 
-        compose.onNodeWithText("Cancelar reserva").performClick()
+        compose.onNodeWithText("Cancelar reserva").performScrollTo().performClick()
         compose.mainClock.advanceTimeByFrame()
 
         compose.onNodeWithText("¿Cancelar la reserva?").assertExists()
@@ -124,7 +129,7 @@ class ReservationScreensUiTest {
         val vm = myReservationsViewModel()
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SensorParkTheme { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
+            SensorParkTheme(dynamicColor = false) { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
         }
         compose.settle()
 
@@ -138,7 +143,7 @@ class ReservationScreensUiTest {
         val vm = myReservationsViewModel()
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SensorParkTheme { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
+            SensorParkTheme(dynamicColor = false) { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
         }
         compose.settle()
 
@@ -173,7 +178,11 @@ internal const val DEMO_SCREENSHOTS = "/sdcard/Download/sensorpark-demo"
  * desinstala al terminar.
  */
 internal fun ComposeContentTestRule.screenshot(name: String) {
+    // Con el reloj de Compose en manual hay que pedir un frame y darle tiempo a llegar a la
+    // pantalla; si no, `screencap` saca el frame anterior.
+    mainClock.advanceTimeByFrame()
     waitForIdle()
+    Thread.sleep(500)
     val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
     // Leer la salida hasta el final es lo que espera a que el comando termine.
     fun shell(command: String) =

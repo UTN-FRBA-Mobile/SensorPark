@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sensorpark.core.testing.FakeAlertMessages
 import com.sensorpark.core.testing.FakeGeofenceRepository
@@ -51,7 +52,7 @@ class CheckInScreenUiTest {
         val vm = viewModel()
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SensorParkTheme { CheckInScreen(reservationId = "res-1", vm = vm) }
+            SensorParkTheme(dynamicColor = false) { CheckInScreen(reservationId = "res-1", vm = vm) }
         }
         compose.mainClock.advanceTimeByFrame()
 
@@ -63,7 +64,7 @@ class CheckInScreenUiTest {
         compose.screenshot("05-check-in")
 
         // 2. Confirmar la llegada: la reserva pasa a en uso.
-        compose.onNodeWithText("Confirmar que llegué").performClick()
+        compose.onNodeWithText("Confirmar que llegué").performScrollTo().performClick()
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeByFrame()
 
@@ -78,7 +79,7 @@ class CheckInScreenUiTest {
         compose.screenshot("07-lugar-confirmado")
 
         // 4. Salir: el resumen con la estadía y el importe.
-        compose.onNodeWithText("Salir").performClick()
+        compose.onNodeWithText("Salir").performScrollTo().performClick()
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeByFrame()
 
@@ -93,11 +94,11 @@ class CheckInScreenUiTest {
         val vm = viewModel()
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SensorParkTheme { CheckInScreen(reservationId = "res-1", vm = vm) }
+            SensorParkTheme(dynamicColor = false) { CheckInScreen(reservationId = "res-1", vm = vm) }
         }
         compose.mainClock.advanceTimeByFrame()
 
-        compose.onNodeWithText("Confirmar que llegué").performClick()
+        compose.onNodeWithText("Confirmar que llegué").performScrollTo().performClick()
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeByFrame()
 
@@ -111,7 +112,7 @@ class CheckInScreenUiTest {
         val vm = viewModel()
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SensorParkTheme { CheckInScreen(reservationId = "res-1", vm = vm) }
+            SensorParkTheme(dynamicColor = false) { CheckInScreen(reservationId = "res-1", vm = vm) }
         }
         compose.mainClock.advanceTimeByFrame()
 
@@ -119,7 +120,7 @@ class CheckInScreenUiTest {
         compose.onNodeWithText("Pedir otro lugar").assertExists()
         compose.screenshot("10-lugar-ocupado")
 
-        compose.onNodeWithText("Pedir otro lugar").performClick()
+        compose.onNodeWithText("Pedir otro lugar").performScrollTo().performClick()
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeByFrame()
 
@@ -158,7 +159,11 @@ internal const val DEMO_SCREENSHOTS = "/sdcard/Download/sensorpark-demo"
  * desinstala al terminar.
  */
 internal fun ComposeContentTestRule.screenshot(name: String) {
+    // Con el reloj de Compose en manual hay que pedir un frame y darle tiempo a llegar a la
+    // pantalla; si no, `screencap` saca el frame anterior.
+    mainClock.advanceTimeByFrame()
     waitForIdle()
+    Thread.sleep(500)
     val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
     // Leer la salida hasta el final es lo que espera a que el comando termine.
     fun shell(command: String) =
