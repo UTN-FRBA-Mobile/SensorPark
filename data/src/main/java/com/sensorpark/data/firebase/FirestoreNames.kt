@@ -21,6 +21,9 @@ object UserFields {
     const val REQUESTED_ROLE = "requestedRole"
     const val CATEGORY = "category"
     const val FCM_TOKEN = "fcmToken"
+
+    /** Tipos de aviso que el usuario apagó, por nombre de `NotificationType`. Lo lee T17. */
+    const val NOTIFICATIONS_DISABLED = "notificationsDisabled"
     const val CREATED_AT = "createdAt"
 }
 

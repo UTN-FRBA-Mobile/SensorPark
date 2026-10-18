@@ -6,9 +6,21 @@ import com.sensorpark.data.firebase.ParkingLotRepositoryFirebase
 import com.sensorpark.data.firebase.ReservationRepositoryFirebase
 import com.sensorpark.data.firebase.SpotAvailabilityRepositoryFirebase
 import com.sensorpark.data.firebase.UserRepositoryFirebase
+import com.sensorpark.data.geofence.GeofenceRepositoryPlayServices
+import com.sensorpark.data.location.LocationRepositoryPlayServices
+import com.sensorpark.data.notifications.AndroidNotificationRepository
+import com.sensorpark.data.notifications.ResourceReservationAlertMessages
+import com.sensorpark.data.preferences.NotificationPreferencesStore
+import com.sensorpark.data.work.WorkManagerReminderScheduler
+import com.sensorpark.domain.notification.ReservationAlertMessages
 import com.sensorpark.domain.repository.AuthRepository
 import com.sensorpark.domain.repository.DeviceRepository
+import com.sensorpark.domain.repository.GeofenceRepository
+import com.sensorpark.domain.repository.LocationRepository
+import com.sensorpark.domain.repository.NotificationPreferencesRepository
+import com.sensorpark.domain.repository.NotificationRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
+import com.sensorpark.domain.repository.ReminderScheduler
 import com.sensorpark.domain.repository.ReservationRepository
 import com.sensorpark.domain.repository.SpotAvailabilityRepository
 import com.sensorpark.domain.repository.UserRepository
@@ -48,4 +60,30 @@ abstract class RepositoriesModule {
     @Binds
     @Singleton
     abstract fun reservationRepository(impl: ReservationRepositoryFirebase): ReservationRepository
+
+    @Binds
+    @Singleton
+    abstract fun notificationRepository(impl: AndroidNotificationRepository): NotificationRepository
+
+    @Binds
+    @Singleton
+    abstract fun notificationPreferencesRepository(
+        impl: NotificationPreferencesStore,
+    ): NotificationPreferencesRepository
+
+    @Binds
+    @Singleton
+    abstract fun geofenceRepository(impl: GeofenceRepositoryPlayServices): GeofenceRepository
+
+    @Binds
+    @Singleton
+    abstract fun locationRepository(impl: LocationRepositoryPlayServices): LocationRepository
+
+    @Binds
+    @Singleton
+    abstract fun reminderScheduler(impl: WorkManagerReminderScheduler): ReminderScheduler
+
+    @Binds
+    @Singleton
+    abstract fun reservationAlertMessages(impl: ResourceReservationAlertMessages): ReservationAlertMessages
 }

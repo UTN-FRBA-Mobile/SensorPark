@@ -41,7 +41,16 @@
     <string name="account_role_parking_admin">Administrador de estacionamiento</string>
     <string name="account_role_admin">Administrador del sistema</string>
     <string name="account_notifications">Avisos</string>
-    <string name="account_notifications_pending">Próximamente: elegir qué avisos recibir.</string>
+    <string name="account_notifications_reservation">Reservas</string>
+    <string name="account_notifications_reminder">Recordatorios</string>
+    <string name="account_notifications_arrival">Llegada al estacionamiento</string>
+    <string name="account_notifications_waitlist">Lista de espera</string>
+
+    <!-- Permisos, pedidos después de la primera reserva -->
+    <string name="permissions_title">Para avisarte cuando llegues</string>
+    <string name="permissions_body">Con tu permiso de avisos te confirmamos la reserva y te recordamos la hora de llegada. Con el de ubicación, el celular detecta solo que llegaste al estacionamiento y te ofrece hacer el check-in.\n\nSi preferís que no, la app funciona igual: hacés el check-in desde Mis reservas.</string>
+    <string name="permissions_accept">Dar permiso</string>
+    <string name="permissions_later">Ahora no</string>
     <string name="account_dev_tools">Herramientas de desarrollo</string>
     <string name="account_diagnostics">Diagnóstico de configuración</string>
 </resources>
