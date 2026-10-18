@@ -1,5 +1,7 @@
 package com.sensorpark.feature.reservations
 
+import com.sensorpark.core.testing.FakeParkingLotRepository
+import com.sensorpark.core.testing.FakeReservationRepository
 import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.DataErrorReason
 import com.sensorpark.domain.model.ParkingLot
