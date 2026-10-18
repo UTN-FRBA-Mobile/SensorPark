@@ -82,7 +82,12 @@ fun CheckInScreen(reservationId: String, vm: CheckInViewModel = hiltViewModel())
                     when {
                         summary != null -> Summary(summary, reservation)
                         state.isInUse -> Stay(state, reservation, onCheckOut = vm::checkOut)
-                        else -> CheckIn(state, now, onCheckIn = vm::checkIn)
+                        else -> CheckIn(
+                            state = state,
+                            now = now,
+                            onCheckIn = vm::checkIn,
+                            onRequestAnotherSpot = vm::requestAnotherSpot,
+                        )
                     }
                     state.message?.let { Message(it, onDismiss = vm::dismissMessage) }
                 }
@@ -117,7 +122,12 @@ private fun Details(reservation: Reservation, lot: ParkingLot?) {
 }
 
 @Composable
-private fun CheckIn(state: CheckInState, now: Instant, onCheckIn: () -> Unit) {
+private fun CheckIn(
+    state: CheckInState,
+    now: Instant,
+    onCheckIn: () -> Unit,
+    onRequestAnotherSpot: () -> Unit,
+) {
     val left = state.toleranceLeft(now)
     if (left.isZero) {
         Text(stringResource(R.string.check_in_tolerance_over), color = MaterialTheme.colorScheme.error)
@@ -127,9 +137,16 @@ private fun CheckIn(state: CheckInState, now: Instant, onCheckIn: () -> Unit) {
 
     if (state.spotTaken) {
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.check_in_spot_taken_title), style = MaterialTheme.typography.titleSmall)
                 Text(stringResource(R.string.check_in_spot_taken_body))
+                Button(
+                    onClick = onRequestAnotherSpot,
+                    enabled = !state.working,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.check_in_request_another_spot))
+                }
             }
         }
     }
@@ -196,6 +213,8 @@ private fun CheckInMessage.text(): Int = when (this) {
     CheckInMessage.NO_CONNECTION -> R.string.check_in_error_no_connection
     CheckInMessage.UNKNOWN_ERROR -> R.string.check_in_error_unknown
     CheckInMessage.SPOT_TAKEN -> R.string.check_in_spot_taken_body
+    CheckInMessage.NO_OTHER_SPOT -> R.string.check_in_no_other_spot
+    CheckInMessage.SPOT_REASSIGNED -> R.string.check_in_spot_reassigned
 }
 
 /** "12 min" o "1 h 05 min". */

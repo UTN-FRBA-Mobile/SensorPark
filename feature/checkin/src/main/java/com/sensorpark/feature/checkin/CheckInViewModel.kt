@@ -10,6 +10,7 @@ import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationStatus
+import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.model.SpotStatus
 import com.sensorpark.domain.repository.LocationRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
@@ -18,6 +19,7 @@ import com.sensorpark.domain.repository.SpotAvailabilityRepository
 import com.sensorpark.domain.reservation.ReservationRules
 import com.sensorpark.domain.usecase.CheckInUseCase
 import com.sensorpark.domain.usecase.CheckOutUseCase
+import com.sensorpark.domain.usecase.ReassignSpotUseCase
 import com.sensorpark.domain.usecase.SyncReservationAlertsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -52,14 +54,20 @@ enum class CheckInMessage {
 
     /** El lugar asignado figura ocupado por otro auto. */
     SPOT_TAKEN,
+
+    /** Se pidió otro lugar y no quedaba ninguno del mismo tipo. */
+    NO_OTHER_SPOT,
+
+    /** Se reasignó: la pantalla ya muestra el lugar nuevo. */
+    SPOT_REASSIGNED,
 }
 
 data class CheckInState(
     val loading: Boolean = true,
     val reservation: Reservation? = null,
     val parkingLot: ParkingLot? = null,
-    /** Estado del lugar asignado según el sensor; null mientras no se sepa. */
-    val spotStatus: SpotStatus? = null,
+    /** El lugar asignado tal como lo ve el sensor; null mientras no se sepa. */
+    val spot: Spot? = null,
     val notFound: Boolean = false,
     val failure: DataErrorReason? = null,
     /** Hay una llamada al backend en curso. */
@@ -71,11 +79,11 @@ data class CheckInState(
     val isInUse: Boolean get() = reservation?.status == ReservationStatus.IN_USE
 
     /** Después del check-in, el sensor confirma que el auto está en el lugar. */
-    val spotConfirmed: Boolean get() = isInUse && spotStatus == SpotStatus.OCCUPIED
+    val spotConfirmed: Boolean get() = isInUse && spot?.status == SpotStatus.OCCUPIED
 
     /** Antes del check-in, un lugar ocupado quiere decir que lo tomó otro auto. */
     val spotTaken: Boolean
-        get() = reservation?.status == ReservationStatus.CONFIRMED && spotStatus == SpotStatus.OCCUPIED
+        get() = reservation?.status == ReservationStatus.CONFIRMED && spot?.status == SpotStatus.OCCUPIED
 
     fun toleranceLeft(now: Instant): Duration {
         val until = reservation?.toleranceUntil ?: return Duration.ZERO
@@ -113,6 +121,7 @@ class CheckInViewModel @Inject constructor(
     private val location: LocationRepository,
     private val checkInUseCase: CheckInUseCase,
     private val checkOutUseCase: CheckOutUseCase,
+    private val reassignSpotUseCase: ReassignSpotUseCase,
     private val syncAlerts: SyncReservationAlertsUseCase,
     private val clock: Clock,
 ) : ViewModel() {
@@ -176,6 +185,30 @@ class CheckInViewModel @Inject constructor(
         }
     }
 
+    /** El lugar asignado lo tomó otro auto: pedirle al backend otro del mismo tipo. */
+    fun requestAnotherSpot() {
+        val current = state.value
+        val reservation = current.reservation ?: return
+        if (current.working) return
+
+        viewModelScope.launch {
+            action.update { it.copy(working = true, message = null) }
+            val spot = current.spot
+            val message = when (val outcome = reassignSpotUseCase(reservation, spot)) {
+                is ReservationOutcome.Success -> CheckInMessage.SPOT_REASSIGNED
+                is ReservationOutcome.Rejected -> when (outcome.reason) {
+                    ReservationRejection.NO_SPOTS -> CheckInMessage.NO_OTHER_SPOT
+                    ReservationRejection.EXPIRED -> CheckInMessage.EXPIRED
+                    else -> CheckInMessage.UNKNOWN_ERROR
+                }
+                is ReservationOutcome.Failed ->
+                    if (outcome.reason == DataErrorReason.NO_CONNECTION) CheckInMessage.NO_CONNECTION
+                    else CheckInMessage.UNKNOWN_ERROR
+            }
+            action.update { it.copy(working = false, message = message) }
+        }
+    }
+
     fun checkOut() {
         val reservation = state.value.reservation ?: return
         if (state.value.working) return
@@ -223,8 +256,8 @@ class CheckInViewModel @Inject constructor(
             loading = false,
             reservation = reservation,
             parkingLot = (lotResult as? DataResult.Success)?.value,
-            spotStatus = (spotsResult as? DataResult.Success)?.value
-                ?.spots?.firstOrNull { it.id == reservation.spotId }?.status,
+            spot = (spotsResult as? DataResult.Success)?.value
+                ?.spots?.firstOrNull { it.id == reservation.spotId },
             failure = (lotResult as? DataResult.Failure)?.reason,
         )
     }

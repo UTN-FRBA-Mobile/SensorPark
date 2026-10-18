@@ -4,6 +4,8 @@ import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.LocationReading
 import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.model.Reservation
+import com.sensorpark.domain.model.ReservationOutcome
+import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.model.SpotAvailability
@@ -12,6 +14,7 @@ import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.notification.InMemoryNotificationRepository
 import com.sensorpark.domain.usecase.CheckInUseCase
 import com.sensorpark.domain.usecase.CheckOutUseCase
+import com.sensorpark.domain.usecase.ReassignSpotUseCase
 import com.sensorpark.domain.usecase.SyncReservationAlertsUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -147,6 +150,49 @@ class CheckInViewModelTest {
     }
 
     @Test
+    fun conElLugarTomadoPorOtroSePuedePedirOtroLugar() = runTest {
+        val world = World()
+        val vm = world.viewModel()
+        collecting(vm)
+        vm.load(RESERVATION_ID)
+        world.spots.emit(availability(SpotStatus.OCCUPIED))
+
+        vm.requestAnotherSpot()
+
+        assertEquals(listOf(RESERVATION_ID), world.reservations.reassigned)
+        assertEquals(CheckInMessage.SPOT_REASSIGNED, vm.state.value.message)
+    }
+
+    @Test
+    fun siNoQuedaOtroLugarLoAvisaSinRomperNada() = runTest {
+        val world = World()
+        world.reservations.reassignResult = ReservationOutcome.Rejected(ReservationRejection.NO_SPOTS)
+        val vm = world.viewModel()
+        collecting(vm)
+        vm.load(RESERVATION_ID)
+        world.spots.emit(availability(SpotStatus.OCCUPIED))
+
+        vm.requestAnotherSpot()
+
+        assertEquals(CheckInMessage.NO_OTHER_SPOT, vm.state.value.message)
+        assertFalse(vm.state.value.working)
+    }
+
+    @Test
+    fun conElLugarLibreNoSePideOtroNiSeLlamaAlBackend() = runTest {
+        val world = World()
+        val vm = world.viewModel()
+        collecting(vm)
+        vm.load(RESERVATION_ID)
+        world.spots.emit(availability(SpotStatus.FREE))
+
+        vm.requestAnotherSpot()
+
+        assertEquals(emptyList<String>(), world.reservations.reassigned)
+        assertEquals(CheckInMessage.UNKNOWN_ERROR, vm.state.value.message)
+    }
+
+    @Test
     fun elCheckOutMuestraElResumenYLiberaLaReserva() = runTest {
         val world = World()
         world.reservations.emit(listOf(reservation(status = ReservationStatus.IN_USE)))
@@ -179,6 +225,7 @@ class CheckInViewModelTest {
             location = location,
             checkInUseCase = CheckInUseCase(reservations, clock),
             checkOutUseCase = CheckOutUseCase(reservations),
+            reassignSpotUseCase = ReassignSpotUseCase(reservations, clock),
             syncAlerts = SyncReservationAlertsUseCase(
                 reservations = reservations,
                 parkingLots = parkingLots,

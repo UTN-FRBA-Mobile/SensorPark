@@ -23,6 +23,7 @@ const MESSAGES = {
   TOO_FAR: "Tenés que estar en el estacionamiento para hacer check-in.",
   INVALID_STATUS: "La reserva no está en uso.",
   ALREADY_IN_WAITLIST: "Ya estás anotado en la lista de espera para esa franja.",
+  SPOT_NOT_TAKEN: "Tu lugar no figura ocupado por otro auto.",
 };
 
 // Rechazo de negocio: la app lee el motivo en `details.reason`.
@@ -215,6 +216,61 @@ exports.cancelReservation = onCall(async (request) => {
     tx.update(ref, { status: "CANCELLED", cancelledAt: FieldValue.serverTimestamp() });
     release();
     return { status: "CANCELLED" };
+  });
+});
+
+// Le da otro lugar del mismo tipo a una reserva cuyo lugar apareció ocupado por otro auto
+// (la incidencia de T21). Datos: { reservationId }.
+//
+// El lugar viejo no se toca: lo está ocupando un auto de verdad, y el sensor es el que manda sobre
+// su estado. Lo único que cambia es a qué lugar apunta la reserva.
+exports.reassignSpot = onCall(async (request) => {
+  const uid = requireSignedIn(request);
+  const db = getFirestore();
+  const now = new Date();
+
+  return db.runTransaction(async (tx) => {
+    const { ref, reservation } = await ownReservation(tx, db, uid, (request.data || {}).reservationId);
+    const lotRef = db.doc(`parkingLots/${reservation.parkingLotId}`);
+    const lot = await tx.get(lotRef);
+    if (!lot.exists) throw new HttpsError("not-found", "No existe ese estacionamiento.");
+
+    const spots = (await tx.get(lotRef.collection("spots"))).docs.map(spotOf);
+    const lotReservations = (await tx.get(activeReservationsOfLot(db, reservation.parkingLotId)))
+      .docs.map(reservationOf);
+    const category = await categoryOf(tx, db, uid);
+
+    const current = spots.find((s) => s.id === reservation.spotId);
+    const problem = rules.reassignProblem(reservation, current, now);
+    if (problem) throw rejection(problem);
+
+    // Otro lugar del mismo tipo, sin contar el que quedó ocupado ni la reserva que se está moviendo.
+    const spot = rules.pickSpot(spots.filter((s) => s.id !== reservation.spotId), {
+      spotType: reservation.spotType,
+      spotId: null,
+      category,
+      arrivesAt: reservation.arrivesAt,
+      endsAt: reservation.endsAt,
+      reservations: lotReservations.filter((r) => r.id !== reservation.id),
+    }, now);
+    if (!spot) throw rejection("NO_SPOTS");
+
+    tx.update(ref, {
+      spotId: spot.id,
+      spotCode: spot.code,
+      reassignedAt: FieldValue.serverTimestamp(),
+    });
+    const spotUpdate = { lastReservationAt: FieldValue.serverTimestamp() };
+    if (rules.isInNowWindow(reservation.arrivesAt, now)) {
+      spotUpdate.status = "RESERVED";
+      spotUpdate.updatedAt = FieldValue.serverTimestamp();
+    }
+    tx.update(lotRef.collection("spots").doc(spot.id), spotUpdate);
+
+    logger.info("Lugar reasignado", {
+      reservationId: reservation.id, uid, from: reservation.spotId, to: spot.id,
+    });
+    return { spotId: spot.id, spotCode: spot.code };
   });
 });
 

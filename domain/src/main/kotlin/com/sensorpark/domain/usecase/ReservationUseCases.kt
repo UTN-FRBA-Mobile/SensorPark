@@ -11,6 +11,8 @@ import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationRequest
 import com.sensorpark.domain.model.ReservationStatus
+import com.sensorpark.domain.model.Spot
+import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.repository.ReservationRepository
 import com.sensorpark.domain.reservation.ReservationRules
@@ -60,6 +62,21 @@ class CheckInUseCase @Inject constructor(
         ReservationRules.checkInProblem(reservation, lot, location, clock.instant())
             ?.let { return ReservationOutcome.Rejected(it) }
         return reservations.checkIn(reservation.id, location)
+    }
+}
+
+/**
+ * Pedir otro lugar porque el asignado apareció ocupado por otro auto. La franja no cambia: sólo
+ * cambia a qué lugar apunta la reserva.
+ */
+class ReassignSpotUseCase @Inject constructor(
+    private val reservations: ReservationRepository,
+    private val clock: Clock,
+) {
+    suspend operator fun invoke(reservation: Reservation, spot: Spot?): ReservationOutcome<SpotReassignment> {
+        ReservationRules.reassignProblem(reservation, spot, clock.instant())
+            ?.let { return ReservationOutcome.Rejected(it) }
+        return reservations.reassignSpot(reservation.id)
     }
 }
 

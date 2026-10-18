@@ -11,6 +11,9 @@ import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationRequest
 import com.sensorpark.domain.model.ReservationStatus
+import com.sensorpark.domain.model.Spot
+import com.sensorpark.domain.model.SpotReassignment
+import com.sensorpark.domain.model.SpotStatus
 import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.repository.ReservationRepository
@@ -48,6 +51,11 @@ class ReservationUseCasesTest {
         override suspend fun cancel(reservationId: String): ReservationOutcome<Unit> {
             calls += "cancel"
             return ReservationOutcome.Success(Unit)
+        }
+
+        override suspend fun reassignSpot(reservationId: String): ReservationOutcome<SpotReassignment> {
+            calls += "reassignSpot"
+            return ReservationOutcome.Success(SpotReassignment(spotId = "spot-09", spotCode = "09"))
         }
 
         override suspend fun checkIn(reservationId: String, location: Coordinates): ReservationOutcome<Unit> {
@@ -101,6 +109,43 @@ class ReservationUseCasesTest {
 
         val oneActive = FakeReservationRepository(listOf(reservation(ReservationStatus.CONFIRMED), reservation(ReservationStatus.CANCELLED)))
         assertTrue(CreateReservationUseCase(oneActive, clock)(request, lot, Category.STANDARD) is ReservationOutcome.Success)
+    }
+
+    @Test
+    fun `con el lugar tomado por otro auto se pide otro al backend`() = runTest {
+        val repo = FakeReservationRepository()
+        val taken = Spot("01", "01", SpotType.STANDARD, SpotStatus.OCCUPIED)
+
+        val result = ReassignSpotUseCase(repo, clock)(reservation(ReservationStatus.CONFIRMED), taken)
+
+        assertEquals(ReservationOutcome.Success(SpotReassignment("spot-09", "09")), result)
+        assertEquals(listOf("reassignSpot"), repo.calls)
+    }
+
+    @Test
+    fun `con el lugar libre no se pide otro ni se llama al backend`() = runTest {
+        val repo = FakeReservationRepository()
+        val free = Spot("01", "01", SpotType.STANDARD, SpotStatus.FREE)
+
+        assertEquals(
+            ReservationOutcome.Rejected(ReservationRejection.SPOT_NOT_TAKEN),
+            ReassignSpotUseCase(repo, clock)(reservation(ReservationStatus.CONFIRMED), free),
+        )
+        assertTrue(repo.calls.isEmpty())
+    }
+
+    @Test
+    fun `pasada la tolerancia no se pide otro lugar`() = runTest {
+        val repo = FakeReservationRepository()
+        val taken = Spot("01", "01", SpotType.STANDARD, SpotStatus.OCCUPIED)
+        // Llegó hace una hora: la tolerancia era de 15 minutos.
+        val expired = reservation(ReservationStatus.CONFIRMED, arrivesAt = now.minus(Duration.ofHours(1)))
+
+        assertEquals(
+            ReservationOutcome.Rejected(ReservationRejection.EXPIRED),
+            ReassignSpotUseCase(repo, clock)(expired, taken),
+        )
+        assertTrue(repo.calls.isEmpty())
     }
 
     @Test

@@ -122,6 +122,17 @@ object ReservationRules {
     fun cancelProblem(reservation: Reservation): ReservationRejection? =
         if (reservation.status == ReservationStatus.CONFIRMED) null else ReservationRejection.CANCEL_NOT_ALLOWED
 
+    /**
+     * Motivo por el que no se puede pedir otro lugar, o null. Sólo tiene sentido con una reserva
+     * confirmada y en tolerancia cuyo lugar aparece ocupado por un auto que no es el suyo.
+     */
+    fun reassignProblem(reservation: Reservation, spot: Spot?, now: Instant): ReservationRejection? = when {
+        reservation.status != ReservationStatus.CONFIRMED -> ReservationRejection.INVALID_STATUS
+        now > reservation.toleranceUntil -> ReservationRejection.EXPIRED
+        spot == null || spot.status != SpotStatus.OCCUPIED -> ReservationRejection.SPOT_NOT_TAKEN
+        else -> null
+    }
+
     fun checkInProblem(
         reservation: Reservation,
         lot: ParkingLot,

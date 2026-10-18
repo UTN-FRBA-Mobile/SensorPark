@@ -94,6 +94,17 @@ Sólo el dueño, y sólo mientras la reserva está `CONFIRMED` (antes del check-
 puede cancelar hasta que vence. Si no, `CANCEL_NOT_ALLOWED`. No existe "modificar": para cambiar la
 hora o la duración se cancela y se reserva de nuevo.
 
+## Pedir otro lugar
+
+Cuando el sensor marca el lugar asignado como `OCCUPIED` antes del check-in, quiere decir que lo
+tomó otro auto. El dueño puede pedir otro lugar del mismo tipo, con la reserva todavía `CONFIRMED`
+(si no, `INVALID_STATUS`) y dentro de la tolerancia (si no, `EXPIRED`). Si el lugar no figura
+ocupado por otro auto no hay nada que reasignar: `SPOT_NOT_TAKEN`. El lugar nuevo se elige con las
+mismas reglas que al reservar, sin contar el que quedó ocupado; si no hay ninguno, `NO_SPOTS`.
+
+La franja no cambia, y el lugar viejo tampoco se toca: lo está ocupando un auto de verdad y el
+sensor es el que manda sobre su estado.
+
 ## Check-in y check-out
 
 - **Check-in:** sólo el dueño, con la reserva `CONFIRMED` (en cualquier otro estado, `EXPIRED`:

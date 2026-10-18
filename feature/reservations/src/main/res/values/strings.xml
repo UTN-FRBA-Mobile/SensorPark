@@ -1,11 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="reserve_title">Reservar</string>
-    <string name="reserve_pending">Próximamente: elegir día, hora de llegada y tipo de lugar.</string>
+    <string name="reserve_when">¿Cuándo llegás?</string>
+    <string name="reserve_date">Día: %1$02d/%2$02d</string>
+    <string name="reserve_time">Hora de llegada: %1$s</string>
+    <string name="reserve_duration">¿Cuánto te quedás?</string>
+    <string name="reserve_slot">De %1$s a %2$s</string>
+    <string name="reserve_spot_type">Tipo de lugar</string>
+    <string name="reserve_free_now_hint">Libres ahora de ese tipo. La disponibilidad de tu franja la confirma el servidor al reservar.</string>
+    <string name="reserve_estimated_amount">Tarifa estimada: %1$s</string>
+    <string name="reserve_confirm">Confirmar reserva</string>
+    <string name="reserve_working">Reservando…</string>
+    <string name="reserve_dismiss">Entendido</string>
+    <string name="reserve_accept">Aceptar</string>
+    <string name="reserve_cancel">Cancelar</string>
+
+    <string name="reserve_alternative_shorter">Probá con %1$s, que es más corto.</string>
+    <string name="reserve_alternative_another_time">Probá con otra hora de llegada.</string>
+    <string name="reserve_alternative_another_lot">Buscá otro estacionamiento cerca desde la pestaña Buscar.</string>
+
+    <string name="reserve_done_title">¡Listo, reservaste!</string>
+    <string name="reserve_done_spot">Lugar %1$s</string>
+    <string name="reserve_done_slot">De %1$s a %2$s</string>
+    <string name="reserve_done_tolerance">Tenés hasta las %1$s para hacer el check-in.</string>
     <string name="reserve_go_to_my_reservations">Ir a mis reservas</string>
 
     <string name="my_reservations_title">Mis reservas</string>
-    <string name="my_reservations_pending">Próximamente: la reserva activa con su check-in y check-out, las próximas, las listas de espera y el historial.</string>
-    <string name="my_reservations_highlighted">Abierta desde el aviso de la reserva %1$s.</string>
+    <string name="my_reservations_empty">Todavía no tenés reservas. Buscá un estacionamiento y reservá tu lugar.</string>
+    <string name="my_reservations_active">Ahora</string>
+    <string name="my_reservations_upcoming">Próximas</string>
+    <string name="my_reservations_history">Historial</string>
+    <string name="my_reservations_spot_and_slot">Lugar %1$s · %2$s a %3$s</string>
+    <string name="my_reservations_highlighted">Es la del aviso que tocaste.</string>
+    <string name="my_reservations_tolerance_left">Te quedan %1$s para hacer el check-in</string>
+    <string name="my_reservations_tolerance_over">Se pasó la tolerancia: la reserva venció</string>
+    <string name="my_reservations_time_left">Te quedan %1$s de la franja reservada</string>
     <string name="my_reservations_check_in">Hacer check-in</string>
+    <string name="my_reservations_check_out">Ver la estadía y salir</string>
+    <string name="my_reservations_cancel">Cancelar reserva</string>
+    <string name="my_reservations_cancel_title">¿Cancelar la reserva?</string>
+    <string name="my_reservations_cancel_body">Se libera el lugar y no se puede deshacer. Para cambiar la hora o la duración, cancelá y reservá de nuevo.</string>
+    <string name="my_reservations_cancel_confirm">Sí, cancelar</string>
+    <string name="my_reservations_cancel_keep">No, dejarla</string>
+    <string name="my_reservations_dismiss">Entendido</string>
 </resources>

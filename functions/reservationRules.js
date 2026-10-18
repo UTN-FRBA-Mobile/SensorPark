@@ -106,6 +106,15 @@ function canCancel(reservation) {
   return reservation.status === "CONFIRMED";
 }
 
+// Motivo por el que no se puede pedir otro lugar, o null. Sólo tiene sentido con una reserva
+// confirmada todavía en tolerancia cuyo lugar aparece ocupado por un auto que no es el suyo.
+function reassignProblem(reservation, spot, now) {
+  if (reservation.status !== "CONFIRMED") return "INVALID_STATUS";
+  if (now > reservation.toleranceUntil) return "EXPIRED";
+  if (!spot || spot.status !== "OCCUPIED" || spot.inUseBy === reservation.id) return "SPOT_NOT_TAKEN";
+  return null;
+}
+
 function distanceMeters(from, to) {
   const rad = (deg) => deg * Math.PI / 180;
   const dLat = rad(to.latitude - from.latitude);
@@ -154,6 +163,6 @@ module.exports = {
   NOW_WINDOW_MINUTES, EARLY_CHECK_IN_MINUTES, WAITLIST_OFFER_MINUTES, TIME_ZONE,
   SPOT_TYPES, ACTIVE_STATUSES, SPECIAL_CATEGORIES,
   endsAt, toleranceUntil, localMinutes, withinSchedule, requestProblem, overlaps, takenUntil,
-  isInNowWindow, spotFits, pickSpot, canCancel, distanceMeters, checkInProblem, checkoutSummary,
-  isExpired, spotStatusAfterRelease, waitlistCompare,
+  isInNowWindow, spotFits, pickSpot, canCancel, reassignProblem, distanceMeters, checkInProblem,
+  checkoutSummary, isExpired, spotStatusAfterRelease, waitlistCompare,
 };
