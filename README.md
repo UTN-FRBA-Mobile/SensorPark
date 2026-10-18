@@ -72,10 +72,13 @@ Reglas de dependencia: los `feature` dependen de `domain` y `core/ui`, nunca ent
 - **Una dependencia:** siempre por el catálogo `gradle/libs.versions.toml`, nunca con la versión
   escrita en un `build.gradle.kts`.
 
-Deep link disponible: `sensorpark://reservation/{id}` abre *Mis reservas* en esa reserva. Para probarlo:
+Deep links disponibles: `sensorpark://reservation/{id}` abre *Mis reservas* en esa reserva, y
+`sensorpark://check-in/{id}` abre el check-in de esa reserva (es el que usa el aviso de llegada).
+Para probarlos:
 
 ```
 adb shell am start -a android.intent.action.VIEW -d "sensorpark://reservation/123" com.sensorpark.app
+adb shell am start -a android.intent.action.VIEW -d "sensorpark://check-in/123" com.sensorpark.app
 ```
 
 ## Convenciones
