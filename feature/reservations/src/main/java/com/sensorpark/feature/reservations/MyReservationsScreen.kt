@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -31,10 +32,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sensorpark.core.ui.components.ErrorContent
 import com.sensorpark.core.ui.components.LoadingContent
+import com.sensorpark.core.ui.components.ReservationStatusBadge
 import com.sensorpark.core.ui.components.formatDateAndTime
 import com.sensorpark.core.ui.components.formatDuration
 import com.sensorpark.core.ui.components.formatTime
-import com.sensorpark.core.ui.components.label
 import com.sensorpark.core.ui.components.message
 import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationStatus
@@ -204,9 +205,17 @@ private fun ReservationRow(card: ReservationCard, highlighted: Boolean, action: 
 @Composable
 private fun Header(card: ReservationCard, highlighted: Boolean) {
     val reservation = card.reservation
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(card.parkingLotName, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        Text(reservation.status.label(), style = MaterialTheme.typography.labelLarge)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            card.parkingLotName,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f).padding(end = 8.dp),
+        )
+        ReservationStatusBadge(reservation.status)
     }
     Text(
         stringResource(
