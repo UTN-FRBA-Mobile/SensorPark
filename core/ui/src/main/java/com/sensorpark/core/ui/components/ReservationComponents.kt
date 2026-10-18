@@ -1,0 +1,76 @@
+package com.sensorpark.core.ui.components
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.sensorpark.core.ui.R
+import com.sensorpark.domain.model.ReservationRejection
+import com.sensorpark.domain.model.ReservationStatus
+import com.sensorpark.domain.reservation.ReservationRules
+import java.text.NumberFormat
+import java.time.Duration
+import java.time.Instant
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+// Textos y formatos comunes a las pantallas de reservas y de check-in. Formato argentino:
+// fechas dd/mm, hora de 24 h y pesos.
+
+private val ES_AR = Locale.forLanguageTag("es-AR")
+private val TIME = DateTimeFormatter.ofPattern("HH:mm").withZone(ReservationRules.ZONE)
+private val DATE = DateTimeFormatter.ofPattern("dd/MM").withZone(ReservationRules.ZONE)
+private val DATE_AND_TIME = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ReservationRules.ZONE)
+
+fun formatTime(instant: Instant): String = TIME.format(instant)
+
+fun formatDate(instant: Instant): String = DATE.format(instant)
+
+fun formatDateAndTime(instant: Instant): String = DATE_AND_TIME.format(instant)
+
+/** "$1.500". El importe es informativo: la app no cobra. */
+fun formatAmount(pesos: Int): String = "$" + NumberFormat.getIntegerInstance(ES_AR).format(pesos)
+
+/** "45 min" o "2 h 15 min". */
+fun formatDuration(duration: Duration): String {
+    val hours = duration.toHours()
+    val minutes = duration.toMinutes() % 60
+    return if (hours > 0) "$hours h ${minutes.toString().padStart(2, '0')} min" else "$minutes min"
+}
+
+/** "1 h" o "30 min", para los chips de duración. */
+fun formatDurationMinutes(minutes: Int): String =
+    if (minutes >= 60 && minutes % 60 == 0) "${minutes / 60} h" else "$minutes min"
+
+/**
+ * Por qué el backend rechazó la operación, en un texto que el conductor entienda y que diga qué
+ * puede hacer. Son los mismos motivos que documenta `docs/reservation-rules.md`.
+ */
+@Composable
+fun ReservationRejection.message(): String = stringResource(
+    when (this) {
+        ReservationRejection.INVALID_DURATION -> R.string.rejection_invalid_duration
+        ReservationRejection.IN_THE_PAST -> R.string.rejection_in_the_past
+        ReservationRejection.TOO_FAR_AHEAD -> R.string.rejection_too_far_ahead
+        ReservationRejection.OUTSIDE_SCHEDULE -> R.string.rejection_outside_schedule
+        ReservationRejection.CATEGORY_REQUIRED -> R.string.rejection_category_required
+        ReservationRejection.LIMIT_REACHED -> R.string.rejection_limit_reached
+        ReservationRejection.NO_SPOTS -> R.string.rejection_no_spots
+        ReservationRejection.CANCEL_NOT_ALLOWED -> R.string.rejection_cancel_not_allowed
+        ReservationRejection.TOO_EARLY -> R.string.rejection_too_early
+        ReservationRejection.EXPIRED -> R.string.rejection_expired
+        ReservationRejection.TOO_FAR -> R.string.rejection_too_far
+        ReservationRejection.INVALID_STATUS -> R.string.rejection_invalid_status
+        ReservationRejection.ALREADY_IN_WAITLIST -> R.string.rejection_already_in_waitlist
+        ReservationRejection.SPOT_NOT_TAKEN -> R.string.rejection_spot_not_taken
+    },
+)
+
+@Composable
+fun ReservationStatus.label(): String = stringResource(
+    when (this) {
+        ReservationStatus.CONFIRMED -> R.string.reservation_status_confirmed
+        ReservationStatus.IN_USE -> R.string.reservation_status_in_use
+        ReservationStatus.FINISHED -> R.string.reservation_status_finished
+        ReservationStatus.CANCELLED -> R.string.reservation_status_cancelled
+        ReservationStatus.EXPIRED -> R.string.reservation_status_expired
+    },
+)

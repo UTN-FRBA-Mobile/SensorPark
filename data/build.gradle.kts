@@ -63,5 +63,9 @@ dependencies {
 
     implementation(libs.work.runtime)
 
+    // Geocercas y FusedLocationProvider.
+    implementation(libs.play.services.location)
+
     testImplementation(libs.junit)
+    testImplementation(libs.coroutines.test)
 }

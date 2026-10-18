@@ -34,6 +34,16 @@
                     android:host="reservation"
                     android:scheme="sensorpark" />
             </intent-filter>
+
+            <!-- sensorpark://check-in/{id}: lo abre el aviso de llegada. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="check-in"
+                    android:scheme="sensorpark" />
+            </intent-filter>
         </activity>
     </application>
 
