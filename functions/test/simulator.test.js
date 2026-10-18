@@ -220,10 +220,15 @@ describe("runSimulation", () => {
     }
   });
 
-  test("con intervalo largo hace un solo tick", async () => {
+  test("con intervalo largo hace a lo sumo dos ticks y no se pasa del minuto", async () => {
     const db = fakeDb({ paused: false, intervalSeconds: 60 }, lots(["a"]));
     let clock = 0;
     const result = await runSimulation(db, { now: () => clock, sleep: async (ms) => { clock += ms; }, log: silentLog });
-    assert.equal(result.ticks, 1);
+    // La espera entre ticks varía entre la mitad y una vez y media del intervalo, a propósito. Con
+    // 60 s entra una segunda pasada cuando la espera sale por debajo del presupuesto (55 s), y eso
+    // pasa cerca del 40 % de las veces; una tercera nunca, porque cada espera dura al menos 30 s.
+    // Antes este test pedía exactamente un tick y fallaba al azar.
+    assert.ok(result.ticks >= 1 && result.ticks <= 2, `hizo ${result.ticks} ticks`);
+    assert.ok(clock <= RUN_BUDGET_MS, "termina antes de que arranque la siguiente corrida");
   });
 });
