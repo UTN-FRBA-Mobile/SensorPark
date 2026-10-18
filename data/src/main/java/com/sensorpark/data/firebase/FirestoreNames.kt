@@ -82,6 +82,7 @@ object ReservationFields {
 object ReservationFunctions {
     const val CREATE = "createReservation"
     const val CANCEL = "cancelReservation"
+    const val REASSIGN_SPOT = "reassignSpot"
     const val CHECK_IN = "checkIn"
     const val CHECK_OUT = "checkOut"
     const val JOIN_WAITLIST = "joinWaitlist"

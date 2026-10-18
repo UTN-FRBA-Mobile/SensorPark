@@ -13,6 +13,7 @@ import com.sensorpark.domain.model.ReservationConfirmation
 import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRequest
 import com.sensorpark.domain.model.SpotAvailability
+import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.notification.ReservationAlertMessages
 import com.sensorpark.domain.repository.GeofenceRepository
@@ -33,8 +34,11 @@ class FakeReservationRepository(reservations: List<Reservation> = emptyList()) :
     private val state = MutableStateFlow<DataResult<List<Reservation>>>(DataResult.Success(reservations))
     val checkedIn = mutableListOf<String>()
     val checkedOut = mutableListOf<String>()
+    val reassigned = mutableListOf<String>()
     var checkOutResult: ReservationOutcome<CheckOutSummary> =
         ReservationOutcome.Success(CheckOutSummary(stayMinutes = 45, amount = 750))
+    var reassignResult: ReservationOutcome<SpotReassignment> =
+        ReservationOutcome.Success(SpotReassignment(spotId = "spot-09", spotCode = "09"))
 
     fun emit(reservations: List<Reservation>) {
         state.value = DataResult.Success(reservations)
@@ -47,6 +51,11 @@ class FakeReservationRepository(reservations: List<Reservation> = emptyList()) :
 
     override suspend fun cancel(reservationId: String): ReservationOutcome<Unit> =
         throw UnsupportedOperationException()
+
+    override suspend fun reassignSpot(reservationId: String): ReservationOutcome<SpotReassignment> {
+        reassigned += reservationId
+        return reassignResult
+    }
 
     override suspend fun checkIn(reservationId: String, location: Coordinates): ReservationOutcome<Unit> {
         checkedIn += reservationId

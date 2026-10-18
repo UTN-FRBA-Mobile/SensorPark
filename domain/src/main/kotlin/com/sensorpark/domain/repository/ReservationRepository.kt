@@ -7,6 +7,7 @@ import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationConfirmation
 import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRequest
+import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.WaitlistPosition
 import kotlinx.coroutines.flow.Flow
 
@@ -21,6 +22,9 @@ interface ReservationRepository {
     suspend fun create(request: ReservationRequest): ReservationOutcome<ReservationConfirmation>
 
     suspend fun cancel(reservationId: String): ReservationOutcome<Unit>
+
+    /** Pide otro lugar del mismo tipo porque el asignado apareció ocupado por otro auto. */
+    suspend fun reassignSpot(reservationId: String): ReservationOutcome<SpotReassignment>
 
     suspend fun checkIn(reservationId: String, location: Coordinates): ReservationOutcome<Unit>
 

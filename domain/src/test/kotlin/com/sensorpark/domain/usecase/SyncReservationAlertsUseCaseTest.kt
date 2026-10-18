@@ -12,6 +12,7 @@ import com.sensorpark.domain.model.ReservationConfirmation
 import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRequest
 import com.sensorpark.domain.model.ReservationStatus
+import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.notification.InMemoryNotificationRepository
@@ -243,6 +244,9 @@ private object UnusedReservationRepository : ReservationRepository {
         throw UnsupportedOperationException()
 
     override suspend fun cancel(reservationId: String): ReservationOutcome<Unit> =
+        throw UnsupportedOperationException()
+
+    override suspend fun reassignSpot(reservationId: String): ReservationOutcome<SpotReassignment> =
         throw UnsupportedOperationException()
 
     override suspend fun checkIn(reservationId: String, location: Coordinates): ReservationOutcome<Unit> =

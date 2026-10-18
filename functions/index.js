@@ -98,6 +98,7 @@ exports.updateFreeSpotCounters = onDocumentWritten("parkingLots/{lotId}/spots/{s
 // Reservas y lista de espera (ver reservations.js y docs/reservation-rules.md).
 exports.createReservation = reservations.createReservation;
 exports.cancelReservation = reservations.cancelReservation;
+exports.reassignSpot = reservations.reassignSpot;
 exports.checkIn = reservations.checkIn;
 exports.checkOut = reservations.checkOut;
 exports.joinWaitlist = reservations.joinWaitlist;

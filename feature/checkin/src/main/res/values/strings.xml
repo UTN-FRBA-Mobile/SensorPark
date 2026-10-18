@@ -16,7 +16,10 @@
     <string name="check_in_spot_confirmed">Lugar confirmado por el sensor.</string>
     <string name="check_in_spot_waiting">Esperando que el sensor confirme el lugar…</string>
     <string name="check_in_spot_taken_title">Tu lugar figura ocupado</string>
-    <string name="check_in_spot_taken_body">El sensor marca tu lugar como ocupado por otro auto. Avisá en la entrada del estacionamiento para que te asignen otro.</string>
+    <string name="check_in_spot_taken_body">El sensor marca tu lugar como ocupado por otro auto. Podemos buscarte otro lugar del mismo tipo.</string>
+    <string name="check_in_request_another_spot">Pedir otro lugar</string>
+    <string name="check_in_spot_reassigned">Listo, te asignamos otro lugar. Fijate arriba cuál te tocó.</string>
+    <string name="check_in_no_other_spot">No queda ningún otro lugar de ese tipo. Avisá en la entrada del estacionamiento.</string>
 
     <string name="check_out_action">Salir</string>
     <string name="check_out_until">Reservado hasta las %1$s</string>
