@@ -31,4 +31,10 @@ interface ReservationAlertMessages {
 
     /** La clave del aviso persistente, para poder sacarlo al hacer el check-out. */
     fun stayKey(reservationId: String): String
+
+    /**
+     * Las claves de los avisos que sirven sólo antes de llegar (confirmación, recordatorio y
+     * llegada), para sacarlos todos una vez hecho el check-in: ya no tienen sentido.
+     */
+    fun preArrivalKeys(reservationId: String): List<String>
 }

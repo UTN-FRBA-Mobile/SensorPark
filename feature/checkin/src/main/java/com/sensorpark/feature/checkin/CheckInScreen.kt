@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sensorpark.core.ui.components.formatAmount
 import com.sensorpark.domain.model.CheckOutSummary
 import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.model.Reservation
@@ -187,7 +188,8 @@ private fun Stay(state: CheckInState, reservation: Reservation, onCheckOut: () -
 private fun Summary(summary: CheckOutSummary, reservation: Reservation) {
     Text(stringResource(R.string.check_out_summary_title), style = MaterialTheme.typography.titleMedium)
     Text(stringResource(R.string.check_out_summary_stay, summary.stayMinutes, reservation.durationMinutes))
-    Text(stringResource(R.string.check_out_summary_amount, summary.amount))
+    // Formato argentino: "$2.500".
+    Text(stringResource(R.string.check_out_summary_amount, formatAmount(summary.amount)))
     if (summary.stayMinutes > reservation.durationMinutes) {
         Text(stringResource(R.string.check_out_summary_overstay), color = MaterialTheme.colorScheme.error)
     }

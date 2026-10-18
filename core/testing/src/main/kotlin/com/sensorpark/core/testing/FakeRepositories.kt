@@ -348,4 +348,7 @@ object FakeAlertMessages : com.sensorpark.domain.notification.ReservationAlertMe
     )
 
     override fun stayKey(reservationId: String) = "stay$reservationId"
+
+    override fun preArrivalKeys(reservationId: String) =
+        listOf("reservationConfirmed$reservationId", "reminder$reservationId", "arrival$reservationId")
 }

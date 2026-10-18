@@ -93,6 +93,24 @@ class SyncReservationAlertsUseCaseTest {
     }
 
     @Test
+    fun alHacerCheckInSeSacanLosAvisosDeAntesDeLlegar() = runTest {
+        // Lo encontró el recorrido de la app en el emulador: el "hacé el check-in" y la
+        // confirmación seguían ahí después de hacer el check-in.
+        val world = World()
+        world.sync(listOf(reservation()))
+        world.notifications.notify(TestAlertMessages.arrival(world.geofences.find(RESERVATION_ID)!!))
+        assertEquals(
+            setOf("confirmed$RESERVATION_ID", "arrival$RESERVATION_ID"),
+            world.notifications.shown.value.map { it.key }.toSet(),
+        )
+
+        world.sync(listOf(reservation(status = ReservationStatus.IN_USE)))
+
+        // Queda sólo el aviso persistente de la estadía.
+        assertEquals(listOf("stay$RESERVATION_ID"), world.notifications.shown.value.map { it.key })
+    }
+
+    @Test
     fun alTerminarLaEstadiaSeSacaElAvisoPersistente() = runTest {
         val world = World()
         world.sync(listOf(reservation(status = ReservationStatus.IN_USE)))
@@ -234,6 +252,9 @@ private object TestAlertMessages : ReservationAlertMessages {
     )
 
     override fun stayKey(reservationId: String) = "stay$reservationId"
+
+    override fun preArrivalKeys(reservationId: String) =
+        listOf("confirmed$reservationId", "reminder$reservationId", "arrival$reservationId")
 }
 
 /** La reconciliación se prueba con `sync`, que recibe las listas: estos no se usan. */

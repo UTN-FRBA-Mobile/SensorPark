@@ -58,14 +58,16 @@ class SyncReservationAlertsUseCase @Inject constructor(
                     }
                 }
                 ReservationStatus.IN_USE -> {
-                    // Ya llegó: la geocerca y el recordatorio no tienen más sentido.
+                    // Ya llegó: la geocerca, el recordatorio y los avisos previos no tienen más sentido.
                     forget(reservation.id)
+                    clearPreArrivalNotices(reservation.id)
                     notifications.notify(
                         messages.stay(reservation.id, reservation.spotCode, reservation.endsAt),
                     )
                 }
                 ReservationStatus.FINISHED, ReservationStatus.CANCELLED, ReservationStatus.EXPIRED -> {
                     forget(reservation.id)
+                    clearPreArrivalNotices(reservation.id)
                     notifications.cancel(messages.stayKey(reservation.id))
                 }
             }
@@ -100,6 +102,11 @@ class SyncReservationAlertsUseCase @Inject constructor(
     private suspend fun forget(reservationId: String) {
         geofences.remove(reservationId)
         reminders.cancel(reservationId)
+    }
+
+    /** Confirmación, recordatorio y llegada: una vez que llegó, o que la reserva terminó, sobran. */
+    private suspend fun clearPreArrivalNotices(reservationId: String) {
+        messages.preArrivalKeys(reservationId).forEach { notifications.cancel(it) }
     }
 
     companion object {
