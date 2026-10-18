@@ -1,13 +1,16 @@
 package com.sensorpark.domain.usecase
 
 import com.sensorpark.domain.model.Category
+import com.sensorpark.domain.model.CheckOutSummary
 import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.DataResult
 import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationConfirmation
 import com.sensorpark.domain.model.ReservationOutcome
+import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationRequest
+import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.repository.ReservationRepository
 import com.sensorpark.domain.reservation.ReservationRules
@@ -57,6 +60,21 @@ class CheckInUseCase @Inject constructor(
         ReservationRules.checkInProblem(reservation, lot, location, clock.instant())
             ?.let { return ReservationOutcome.Rejected(it) }
         return reservations.checkIn(reservation.id, location)
+    }
+}
+
+/**
+ * Check-out: termina la estadía y libera el lugar. Puede ser antes o después del fin de la franja;
+ * lo único que no se puede es hacerlo sin estar en uso. El importe lo calcula el backend.
+ */
+class CheckOutUseCase @Inject constructor(
+    private val reservations: ReservationRepository,
+) {
+    suspend operator fun invoke(reservation: Reservation): ReservationOutcome<CheckOutSummary> {
+        if (reservation.status != ReservationStatus.IN_USE) {
+            return ReservationOutcome.Rejected(ReservationRejection.INVALID_STATUS)
+        }
+        return reservations.checkOut(reservation.id)
     }
 }
 

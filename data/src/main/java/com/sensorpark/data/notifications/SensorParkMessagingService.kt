@@ -5,7 +5,10 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.sensorpark.data.R
 import com.sensorpark.data.firebase.DeviceRepositoryFirebase
+import com.sensorpark.domain.model.AppNotification
+import com.sensorpark.domain.model.NotificationType
 import com.sensorpark.domain.navigation.DeepLinks
+import com.sensorpark.domain.repository.NotificationRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,12 +18,15 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Recibe pushes sólo `data` (con bloque `notification`, onMessageReceived no corre en
- * segundo plano). El backend manda `type`, `id`, `title` y `body`, todos strings.
+ * Recibe pushes sólo `data` (con bloque `notification`, onMessageReceived no corre en segundo
+ * plano). El backend manda `type`, `id`, `title` y `body`, todos strings. El `type` decide el
+ * canal y a qué pantalla lleva el toque.
  */
 @AndroidEntryPoint
 class SensorParkMessagingService : FirebaseMessagingService() {
     @Inject lateinit var deviceRepository: DeviceRepositoryFirebase
+
+    @Inject lateinit var notifications: NotificationRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -33,16 +39,21 @@ class SensorParkMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
-        val type = data["type"] ?: return
+        val rawType = data["type"] ?: return
+        // Un tipo que esta versión de la app no conoce se muestra como aviso de reserva.
+        val type = NotificationType.fromPushType(rawType) ?: NotificationType.RESERVATION
         val id = data["id"].orEmpty()
-        Notifications.show(
-            context = this,
-            key = type + id,
-            title = data["title"] ?: getString(R.string.notification_default_title),
-            body = data["body"].orEmpty(),
-            // Los avisos sobre una reserva abren esa reserva.
-            deepLink = if (type.startsWith("reservation") && id.isNotEmpty()) DeepLinks.reservation(id) else null,
-        )
+        scope.launch {
+            notifications.notify(
+                AppNotification(
+                    type = type,
+                    key = rawType + id,
+                    title = data["title"] ?: getString(R.string.notification_default_title),
+                    body = data["body"].orEmpty(),
+                    deepLink = DeepLinks.forNotification(type, id),
+                ),
+            )
+        }
     }
 
     override fun onDestroy() {
