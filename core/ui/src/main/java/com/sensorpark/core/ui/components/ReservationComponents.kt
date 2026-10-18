@@ -117,3 +117,24 @@ fun ReservationStatus.label(): String = stringResource(
         ReservationStatus.EXPIRED -> R.string.reservation_status_expired
     },
 )
+
+@androidx.compose.ui.tooling.preview.Preview(name = "Claro", showBackground = true)
+@androidx.compose.ui.tooling.preview.Preview(
+    name = "Oscuro",
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+    showBackground = true,
+)
+@Composable
+private fun ReservationStatusBadgePreview() {
+    SensorParkTheme {
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+        ) {
+            ReservationStatus.entries.forEach { status ->
+                ReservationStatusBadge(status)
+            }
+        }
+    }
+}
+

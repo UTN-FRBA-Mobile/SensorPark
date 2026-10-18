@@ -140,3 +140,32 @@ private fun ParkingLotCardPreview() {
         }
     }
 }
+
+@Preview(name = "Claro", showBackground = true)
+@Preview(name = "Oscuro", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES, showBackground = true)
+@Composable
+private fun AvailabilityBadgePreview() {
+    SensorParkTheme {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AvailabilityBadge(free = 10, capacity = 14)
+            AvailabilityBadge(free = 2, capacity = 14)
+            AvailabilityBadge(free = 0, capacity = 14)
+        }
+    }
+}
+
+@Preview(name = "Claro", showBackground = true)
+@Preview(name = "Oscuro", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES, showBackground = true)
+@Composable
+private fun ErrorContentPreview() {
+    SensorParkTheme {
+        ErrorContent(
+            reason = DataErrorReason.NO_CONNECTION,
+            onRetry = {},
+        )
+    }
+}
+
