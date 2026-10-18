@@ -1,4 +1,25 @@
 <resources>
-    <string name="general_channel_name">Avisos de SensorPark</string>
     <string name="notification_default_title">SensorPark</string>
+
+    <!-- Canales: uno por tipo de aviso, para poder silenciar sólo uno desde los ajustes. -->
+    <string name="channel_reservations_name">Reservas</string>
+    <string name="channel_reservations_description">Confirmación, cancelación y vencimiento de tus reservas.</string>
+    <string name="channel_reminders_name">Recordatorios</string>
+    <string name="channel_reminders_description">Aviso antes de la hora de llegada.</string>
+    <string name="channel_arrival_name">Llegada</string>
+    <string name="channel_arrival_description">Aviso al llegar al estacionamiento, para hacer el check-in.</string>
+    <string name="channel_waitlist_name">Lista de espera</string>
+    <string name="channel_waitlist_description">Aviso cuando se libera un lugar que estabas esperando.</string>
+
+    <!-- Avisos que genera el propio teléfono. -->
+    <string name="notification_reservation_confirmed_title">Reserva confirmada</string>
+    <string name="notification_reservation_confirmed_body">%1$s · lugar %2$s · llegás %3$s</string>
+    <string name="notification_reminder_title">Tu reserva es en 30 minutos</string>
+    <string name="notification_reminder_body">%1$s · lugar %2$s · llegás %3$s</string>
+    <string name="notification_arrival_title">Llegaste a %1$s</string>
+    <string name="notification_arrival_body">Tu lugar es el %1$s. Hacé el check-in para ocuparlo.</string>
+    <string name="notification_arrival_action">Hacer check-in</string>
+    <string name="notification_stay_title">Estacionado en el lugar %1$s</string>
+    <string name="notification_stay_body">Hasta las %1$s</string>
+    <string name="notification_stay_action">Salir</string>
 </resources>

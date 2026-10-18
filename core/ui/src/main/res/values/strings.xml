@@ -16,4 +16,27 @@
 
     <string name="action_retry">Reintentar</string>
     <string name="placeholder_detail">Pantalla provisoria</string>
+
+    <!-- Estados de una reserva -->
+    <string name="reservation_status_confirmed">Confirmada</string>
+    <string name="reservation_status_in_use">En uso</string>
+    <string name="reservation_status_finished">Terminada</string>
+    <string name="reservation_status_cancelled">Cancelada</string>
+    <string name="reservation_status_expired">Vencida</string>
+
+    <!-- Motivos por los que el backend rechaza una operación de reservas -->
+    <string name="rejection_invalid_duration">Esa duración no está permitida. Elegí una de las opciones.</string>
+    <string name="rejection_in_the_past">Esa hora ya pasó. Elegí una hora más adelante.</string>
+    <string name="rejection_too_far_ahead">Sólo se puede reservar hasta una semana antes.</string>
+    <string name="rejection_outside_schedule">El estacionamiento está cerrado en esa franja. Probá otro horario.</string>
+    <string name="rejection_category_required">Los lugares preferenciales son para quienes declararon una prioridad. Podés cargarla en Cuenta.</string>
+    <string name="rejection_limit_reached">Ya tenés dos reservas activas. Cancelá una para hacer otra.</string>
+    <string name="rejection_no_spots">No queda ningún lugar de ese tipo para esa franja.</string>
+    <string name="rejection_cancel_not_allowed">Esta reserva ya no se puede cancelar.</string>
+    <string name="rejection_too_early">Todavía es muy temprano para el check-in.</string>
+    <string name="rejection_expired">La reserva venció: se pasó la tolerancia para llegar.</string>
+    <string name="rejection_too_far">Estás lejos del estacionamiento.</string>
+    <string name="rejection_invalid_status">Esa acción no corresponde al estado de la reserva.</string>
+    <string name="rejection_already_in_waitlist">Ya estás anotado en la lista de espera.</string>
+    <string name="rejection_spot_not_taken">Tu lugar no figura ocupado por otro auto.</string>
 </resources>

@@ -1,11 +1,7 @@
 package com.sensorpark.app.navigation
 
-import android.Manifest
 import android.content.Intent
-import android.os.Build
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -16,12 +12,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -44,6 +43,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import com.sensorpark.app.R
 import com.sensorpark.app.ui.account.AccountScreen
+import com.sensorpark.app.ui.alerts.AlertsHost
 import com.sensorpark.app.ui.diagnostics.DiagnosticsScreen
 import com.sensorpark.app.ui.login.LoginScreen
 import com.sensorpark.app.ui.login.SignUpScreen
@@ -105,8 +105,13 @@ private fun MainNavigation(state: SessionState.SignedIn, role: Role, onSignOut: 
     val tabs = Tab.forRole(role)
     val backStackEntry by nav.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Avisos, recordatorios, geocercas y permisos: no dibuja nada, cuelga de la pantalla principal.
+    if (role == Role.DRIVER) AlertsHost(snackbarHostState)
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             NavigationBar {
                 tabs.forEach { tab ->
@@ -182,7 +187,11 @@ private fun NavGraphBuilder.reservationsTab(nav: NavHostController) {
                 onCheckIn = { nav.navigate(Route.CheckIn.create(it)) },
             )
         }
-        composable(Route.CheckIn.pattern) { entry ->
+        // El aviso de llegada abre acá directamente, con sensorpark://check-in/{id}.
+        composable(
+            route = Route.CheckIn.pattern,
+            deepLinks = listOf(navDeepLink { uriPattern = DeepLinks.CHECK_IN }),
+        ) { entry ->
             CheckInScreen(reservationId = entry.arguments?.getString(DeepLinks.ARG_RESERVATION_ID).orEmpty())
         }
     }
@@ -233,16 +242,14 @@ private fun HandleNewDeepLinks(nav: NavHostController) {
     }
 }
 
-/** Pide permiso de notificaciones y registra el token al arrancar con sesión (no alcanza con onNewToken). */
+/**
+ * Registra el token de push al arrancar con sesión (no alcanza con onNewToken). El permiso de
+ * notificaciones ya no se pide acá: lo pide [AlertsHost] después de la primera reserva, que es
+ * cuando se entiende para qué sirve.
+ */
 @Composable
 private fun RegisterDevice(register: () -> Unit) {
-    val requestPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        register()
-    }
+    LaunchedEffect(Unit) { register() }
 }
 
 @Composable

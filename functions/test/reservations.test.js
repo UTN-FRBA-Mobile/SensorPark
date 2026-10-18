@@ -219,6 +219,94 @@ describe("cancelar", () => {
   });
 });
 
+describe("pedir otro lugar", () => {
+  // El lugar reservado aparece ocupado por otro auto: lo marca el sensor, sin `inUseBy`.
+  const takenByAnother = (lotId, spotId) =>
+    db.doc(`parkingLots/${lotId}/spots/${spotId}`).update({ status: "OCCUPIED" });
+
+  test("da otro lugar del mismo tipo y la reserva pasa a apuntar ahí", async () => {
+    const driver = await user();
+    const lotId = await parkingLot({ "01": "STANDARD", "02": "STANDARD" });
+    const { result } = await reserve(driver, lotId, { arrivesAt: inMinutes(5) });
+    assert.equal(result.spotCode, "01");
+    await takenByAnother(lotId, "01");
+
+    const response = await call("reassignSpot", { reservationId: result.reservationId }, driver);
+    assert.deepEqual(response.result, { spotId: "02", spotCode: "02" });
+
+    const saved = (await db.doc(`reservations/${result.reservationId}`).get()).data();
+    assert.equal(saved.spotId, "02");
+    assert.equal(saved.spotCode, "02");
+    assert.equal(saved.status, "CONFIRMED");
+    // El lugar viejo lo ocupa un auto de verdad: no se toca.
+    assert.equal(await spotStatus(lotId, "01"), "OCCUPIED");
+    assert.equal(await spotStatus(lotId, "02"), "RESERVED");
+  });
+
+  test("no cambia la franja de la reserva", async () => {
+    const driver = await user();
+    const lotId = await parkingLot({ "01": "STANDARD", "02": "STANDARD" });
+    const { result } = await reserve(driver, lotId, { arrivesAt: inMinutes(5) });
+    await takenByAnother(lotId, "01");
+    await call("reassignSpot", { reservationId: result.reservationId }, driver);
+
+    const saved = (await db.doc(`reservations/${result.reservationId}`).get()).data();
+    assert.equal(saved.arrivesAt.toDate().toISOString(), result.arrivesAt);
+    assert.equal(saved.endsAt.toDate().toISOString(), result.endsAt);
+    assert.equal(saved.toleranceUntil.toDate().toISOString(), result.toleranceUntil);
+  });
+
+  test("sin otro lugar del mismo tipo: NO_SPOTS", async () => {
+    const driver = await user();
+    const lotId = await parkingLot({ "01": "STANDARD" });
+    const { result } = await reserve(driver, lotId, { arrivesAt: inMinutes(5) });
+    await takenByAnother(lotId, "01");
+
+    assertRejected(await call("reassignSpot", { reservationId: result.reservationId }, driver),
+      "FAILED_PRECONDITION", "NO_SPOTS");
+  });
+
+  test("con el lugar libre no hay nada que reasignar: SPOT_NOT_TAKEN", async () => {
+    const driver = await user();
+    const lotId = await parkingLot({ "01": "STANDARD", "02": "STANDARD" });
+    const { result } = await reserve(driver, lotId);
+
+    assertRejected(await call("reassignSpot", { reservationId: result.reservationId }, driver),
+      "FAILED_PRECONDITION", "SPOT_NOT_TAKEN");
+  });
+
+  test("con el lugar ocupado por la propia reserva tampoco: SPOT_NOT_TAKEN", async () => {
+    const driver = await user();
+    const lotId = await parkingLot({ "01": "STANDARD", "02": "STANDARD" });
+    const { result } = await reserve(driver, lotId, { arrivesAt: inMinutes(5) });
+    await db.doc(`parkingLots/${lotId}/spots/01`)
+      .update({ status: "OCCUPIED", inUseBy: result.reservationId });
+
+    assertRejected(await call("reassignSpot", { reservationId: result.reservationId }, driver),
+      "FAILED_PRECONDITION", "SPOT_NOT_TAKEN");
+  });
+
+  test("una reserva cancelada no pide otro lugar: INVALID_STATUS", async () => {
+    const driver = await user();
+    const lotId = await parkingLot({ "01": "STANDARD", "02": "STANDARD" });
+    const { result } = await reserve(driver, lotId, { arrivesAt: inMinutes(5) });
+    await call("cancelReservation", { reservationId: result.reservationId }, driver);
+    await takenByAnother(lotId, "01");
+
+    assertRejected(await call("reassignSpot", { reservationId: result.reservationId }, driver),
+      "FAILED_PRECONDITION", "INVALID_STATUS");
+  });
+
+  test("otro usuario no reasigna una reserva ajena", async () => {
+    const lotId = await parkingLot({ "01": "STANDARD", "02": "STANDARD" });
+    const { result } = await reserve(await user(), lotId, { arrivesAt: inMinutes(5) });
+    await takenByAnother(lotId, "01");
+
+    assertRejected(await call("reassignSpot", { reservationId: result.reservationId }, await user()),
+      "PERMISSION_DENIED");
+  });
+});
+
 describe("check-in y check-out", () => {
   test("check-in demasiado temprano: TOO_EARLY", async () => {
     const driver = await user();

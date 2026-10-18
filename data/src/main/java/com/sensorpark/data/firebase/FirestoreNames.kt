@@ -21,6 +21,9 @@ object UserFields {
     const val REQUESTED_ROLE = "requestedRole"
     const val CATEGORY = "category"
     const val FCM_TOKEN = "fcmToken"
+
+    /** Tipos de aviso que el usuario apagó, por nombre de `NotificationType`. Lo lee T17. */
+    const val NOTIFICATIONS_DISABLED = "notificationsDisabled"
     const val CREATED_AT = "createdAt"
 }
 
@@ -79,6 +82,7 @@ object ReservationFields {
 object ReservationFunctions {
     const val CREATE = "createReservation"
     const val CANCEL = "cancelReservation"
+    const val REASSIGN_SPOT = "reassignSpot"
     const val CHECK_IN = "checkIn"
     const val CHECK_OUT = "checkOut"
     const val JOIN_WAITLIST = "joinWaitlist"

@@ -1,5 +1,39 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="check_in_title">Check-in</string>
-    <string name="check_in_pending">Próximamente: confirmar la llegada a la reserva %1$s con la ubicación del teléfono.</string>
+    <string name="check_in_unknown_lot">Estacionamiento</string>
+    <string name="check_in_spot">Lugar %1$s</string>
+    <string name="check_in_slot">De %1$s a %2$s</string>
+    <string name="check_in_tolerance_left">Te quedan %1$s para hacer el check-in</string>
+    <string name="check_in_tolerance_over">Se pasó la tolerancia: la reserva venció</string>
+    <string name="check_in_action">Confirmar que llegué</string>
+    <string name="check_in_working">Un momento…</string>
+    <string name="check_in_location_hint">Se usa tu ubicación para confirmar que estás en el estacionamiento.</string>
+    <string name="check_in_dismiss">Entendido</string>
+    <string name="check_in_not_found">No encontramos esa reserva.</string>
+    <string name="check_in_failure">No pudimos leer la reserva. Probá de nuevo en un momento.</string>
+
+    <string name="check_in_done_title">Estás estacionado</string>
+    <string name="check_in_spot_confirmed">Lugar confirmado por el sensor.</string>
+    <string name="check_in_spot_waiting">Esperando que el sensor confirme el lugar…</string>
+    <string name="check_in_spot_taken_title">Tu lugar figura ocupado</string>
+    <string name="check_in_spot_taken_body">El sensor marca tu lugar como ocupado por otro auto. Podemos buscarte otro lugar del mismo tipo.</string>
+    <string name="check_in_request_another_spot">Pedir otro lugar</string>
+    <string name="check_in_spot_reassigned">Listo, te asignamos otro lugar. Fijate arriba cuál te tocó.</string>
+    <string name="check_in_no_other_spot">No queda ningún otro lugar de ese tipo. Avisá en la entrada del estacionamiento.</string>
+
+    <string name="check_out_action">Salir</string>
+    <string name="check_out_until">Reservado hasta las %1$s</string>
+    <string name="check_out_summary_title">Listo, liberaste el lugar</string>
+    <string name="check_out_summary_stay">Estuviste %1$d min de los %2$d reservados</string>
+    <string name="check_out_summary_amount">Importe informativo: $%1$d</string>
+    <string name="check_out_summary_overstay">Te pasaste del fin de la franja reservada.</string>
+
+    <string name="check_in_error_too_far">Estás lejos del estacionamiento. Acercate y volvé a intentar.</string>
+    <string name="check_in_error_too_far_low_accuracy">No pudimos confirmar que llegaste: el GPS está impreciso. Acercate a la entrada, salí de abajo del techo y probá de nuevo.</string>
+    <string name="check_in_error_too_early">Todavía es muy temprano para el check-in.</string>
+    <string name="check_in_error_expired">La reserva venció: se pasó la tolerancia para llegar.</string>
+    <string name="check_in_error_no_permission">Necesitamos permiso de ubicación para confirmar que llegaste.</string>
+    <string name="check_in_error_no_location">No pudimos leer tu ubicación. Fijate que el GPS esté prendido.</string>
+    <string name="check_in_error_no_connection">Sin conexión. Probá de nuevo en un momento.</string>
+    <string name="check_in_error_unknown">No pudimos hacer el check-in. Probá de nuevo.</string>
 </resources>

@@ -5,6 +5,16 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Ubicación: el check-in valida que el conductor llegó, y las geocercas avisan la llegada.
+         El permiso en segundo plano es el que necesitan las geocercas; si el usuario lo niega la
+         app sigue andando y el check-in se hace a mano desde "Mis reservas". -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Un reinicio borra las geocercas: hay que volver a registrarlas. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application>
         <!-- Las pushes son sólo `data`: la notificación y los canales se arman en código. -->
         <service
@@ -14,6 +24,19 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- Lo dispara Play Services al entrar al círculo de una reserva. -->
+        <receiver
+            android:name=".geofence.GeofenceReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".geofence.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

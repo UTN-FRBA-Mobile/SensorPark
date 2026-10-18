@@ -16,6 +16,7 @@ import com.sensorpark.domain.model.ReservationConfirmation
 import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationRequest
+import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.repository.ReservationRepository
 import kotlinx.coroutines.TimeoutCancellationException
@@ -76,6 +77,14 @@ class ReservationRepositoryFirebase @Inject constructor(
 
     override suspend fun cancel(reservationId: String): ReservationOutcome<Unit> =
         call(ReservationFunctions.CANCEL, mapOf("reservationId" to reservationId)) { }
+
+    override suspend fun reassignSpot(reservationId: String): ReservationOutcome<SpotReassignment> =
+        call(ReservationFunctions.REASSIGN_SPOT, mapOf("reservationId" to reservationId)) { data ->
+            SpotReassignment(
+                spotId = data["spotId"] as? String ?: return@call null,
+                spotCode = data["spotCode"] as? String ?: return@call null,
+            )
+        }
 
     override suspend fun checkIn(reservationId: String, location: Coordinates): ReservationOutcome<Unit> =
         call(

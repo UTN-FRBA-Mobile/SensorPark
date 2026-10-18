@@ -71,6 +71,9 @@ data class ReservationConfirmation(
 
 data class CheckOutSummary(val stayMinutes: Int, val amount: Int)
 
+/** El lugar nuevo que da el backend cuando el asignado apareció ocupado por otro auto. */
+data class SpotReassignment(val spotId: String, val spotCode: String)
+
 enum class WaitlistStatus { WAITING, LEFT }
 
 /** Una entrada de la lista de espera: alguien que quiere un lugar de [spotType] para esa franja. */
@@ -108,7 +111,10 @@ enum class ReservationRejection {
 
     /** Check-out de una reserva que no está en uso. */
     INVALID_STATUS,
-    ALREADY_IN_WAITLIST;
+    ALREADY_IN_WAITLIST,
+
+    /** Se pidió otro lugar, pero el asignado no figura ocupado por otro auto. */
+    SPOT_NOT_TAKEN;
 
     companion object {
         fun from(value: Any?): ReservationRejection? = entries.firstOrNull { it.name == value }
