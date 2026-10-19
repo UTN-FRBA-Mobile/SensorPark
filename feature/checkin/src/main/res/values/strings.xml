@@ -25,7 +25,7 @@
     <string name="check_out_until">Reservado hasta las %1$s</string>
     <string name="check_out_summary_title">Listo, liberaste el lugar</string>
     <string name="check_out_summary_stay">Estuviste %1$d min de los %2$d reservados</string>
-    <string name="check_out_summary_amount">Importe informativo: $%1$d</string>
+    <string name="check_out_summary_amount">Importe informativo: %1$s</string>
     <string name="check_out_summary_overstay">Te pasaste del fin de la franja reservada.</string>
 
     <string name="check_in_error_too_far">Estás lejos del estacionamiento. Acercate y volvé a intentar.</string>

@@ -1,5 +1,6 @@
 package com.sensorpark.domain.model
 
+import java.time.Duration
 import java.time.Instant
 
 enum class ReservationStatus {
@@ -74,7 +75,39 @@ data class CheckOutSummary(val stayMinutes: Int, val amount: Int)
 /** El lugar nuevo que da el backend cuando el asignado apareció ocupado por otro auto. */
 data class SpotReassignment(val spotId: String, val spotCode: String)
 
-enum class WaitlistStatus { WAITING, LEFT }
+/** Estados de una entrada de la lista de espera; ver `docs/reservation-rules.md`. */
+enum class WaitlistStatus {
+    /** En la fila, esperando que se libere un lugar. */
+    WAITING,
+
+    /** Se liberó un lugar y se lo están guardando unos minutos: tiene que aceptar o rechazar. */
+    OFFERED,
+
+    /** Aceptó la oferta: ahora tiene una reserva. */
+    ACCEPTED,
+
+    /** Rechazó la oferta o la dejó vencer. */
+    DECLINED,
+    LEFT,
+
+    /** Su franja empezó sin que se liberara nada. */
+    EXPIRED;
+
+    /** Las abiertas son las que siguen en la fila: esperando o con una oferta para contestar. */
+    val isOpen: Boolean get() = this == WAITING || this == OFFERED
+
+    companion object {
+        fun from(value: Any?): WaitlistStatus? = entries.firstOrNull { it.name == value }
+    }
+}
+
+/** El lugar que se le guarda al primero de la fila hasta [expiresAt]. */
+data class WaitlistOffer(
+    val spotId: String,
+    val spotCode: String,
+    val offeredAt: Instant,
+    val expiresAt: Instant,
+)
 
 /** Una entrada de la lista de espera: alguien que quiere un lugar de [spotType] para esa franja. */
 data class WaitlistEntry(
@@ -87,7 +120,14 @@ data class WaitlistEntry(
     val category: Category,
     val requestedAt: Instant,
     val status: WaitlistStatus = WaitlistStatus.WAITING,
-)
+    /** Lugar en la fila (1 es el primero); sólo mientras espera. */
+    val position: Int? = null,
+    val offer: WaitlistOffer? = null,
+    /** La reserva que salió de aceptar la oferta. */
+    val reservationId: String? = null,
+) {
+    val endsAt: Instant get() = arrivesAt.plus(Duration.ofMinutes(durationMinutes.toLong()))
+}
 
 /** Resultado de anotarse: la entrada creada y en qué lugar de la fila quedó (1 es el primero). */
 data class WaitlistPosition(val entryId: String, val position: Int)
@@ -114,7 +154,13 @@ enum class ReservationRejection {
     ALREADY_IN_WAITLIST,
 
     /** Se pidió otro lugar, pero el asignado no figura ocupado por otro auto. */
-    SPOT_NOT_TAKEN;
+    SPOT_NOT_TAKEN,
+
+    /** Aceptar o rechazar una entrada de la lista de espera que no tiene una oferta pendiente. */
+    NO_OFFER,
+
+    /** Se pasaron los minutos de la oferta: el lugar ya pasó al siguiente de la fila. */
+    OFFER_EXPIRED;
 
     companion object {
         fun from(value: Any?): ReservationRejection? = entries.firstOrNull { it.name == value }
