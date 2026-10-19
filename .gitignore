@@ -44,3 +44,7 @@ ui-debug.log
 
 # Android Profiling
 *.hprof
+
+# Design mockups / screenshots
+designs/
+
