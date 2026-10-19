@@ -22,4 +22,6 @@
     <string name="notification_stay_title">Estacionado en el lugar %1$s</string>
     <string name="notification_stay_body">Hasta las %1$s</string>
     <string name="notification_stay_action">Salir</string>
+    <string name="notification_waitlist_offer_title">Se liberó un lugar en %1$s</string>
+    <string name="notification_waitlist_offer_body">Lugar %1$s, de %2$s a %3$s. Tenés 5 minutos para quedártelo.</string>
 </resources>

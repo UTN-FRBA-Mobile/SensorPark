@@ -44,6 +44,16 @@
                     android:host="check-in"
                     android:scheme="sensorpark" />
             </intent-filter>
+
+            <!-- sensorpark://waitlist-offer/{id}: lo abre el aviso de que se liberó un lugar. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="waitlist-offer"
+                    android:scheme="sensorpark" />
+            </intent-filter>
         </activity>
     </application>
 

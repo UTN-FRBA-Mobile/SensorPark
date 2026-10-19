@@ -16,6 +16,7 @@ import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.notification.InMemoryNotificationRepository
+import com.sensorpark.domain.model.WaitlistEntry
 import com.sensorpark.domain.notification.ReservationAlertMessages
 import com.sensorpark.domain.repository.GeofenceRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
@@ -255,6 +256,11 @@ private object TestAlertMessages : ReservationAlertMessages {
 
     override fun preArrivalKeys(reservationId: String) =
         listOf("confirmed$reservationId", "reminder$reservationId", "arrival$reservationId")
+
+    override fun waitlistOffer(entry: WaitlistEntry, parkingLotName: String) =
+        AppNotification(NotificationType.WAITLIST, waitlistOfferKey(entry.id), "Se liberó un lugar", parkingLotName)
+
+    override fun waitlistOfferKey(entryId: String) = "waitlist_offer$entryId"
 }
 
 /** La reconciliación se prueba con `sync`, que recibe las listas: estos no se usan. */
@@ -280,6 +286,14 @@ private object UnusedReservationRepository : ReservationRepository {
         throw UnsupportedOperationException()
 
     override suspend fun leaveWaitlist(entryId: String): ReservationOutcome<Unit> =
+        throw UnsupportedOperationException()
+
+    override fun myWaitlist(): Flow<DataResult<List<WaitlistEntry>>> = flowOf(DataResult.Success(emptyList()))
+
+    override suspend fun acceptWaitlistOffer(entryId: String): ReservationOutcome<ReservationConfirmation> =
+        throw UnsupportedOperationException()
+
+    override suspend fun declineWaitlistOffer(entryId: String): ReservationOutcome<Unit> =
         throw UnsupportedOperationException()
 }
 

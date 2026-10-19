@@ -7,16 +7,20 @@ import com.sensorpark.data.notifications.InAppNotifications
 import com.sensorpark.data.preferences.PermissionPromptStore
 import com.sensorpark.domain.model.AppNotification
 import com.sensorpark.domain.model.DataResult
+import com.sensorpark.domain.model.WaitlistEntry
 import com.sensorpark.domain.repository.GeofenceRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
 import com.sensorpark.domain.repository.ReservationRepository
 import com.sensorpark.domain.usecase.SyncReservationAlertsUseCase
+import com.sensorpark.domain.usecase.SyncWaitlistAlertsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -27,6 +31,7 @@ import javax.inject.Inject
  * Lo que la app hace por su cuenta a partir de las reservas, mientras está abierta:
  *
  * - mantiene al día los avisos, el recordatorio y la geocerca de cada reserva (T20);
+ * - avisa cuando la lista de espera le ofrece un lugar liberado (T18);
  * - pide los permisos de avisos y ubicación después de la primera reserva, no al iniciar sesión;
  * - muestra como banner los avisos que no pudieron salir porque falta el permiso.
  */
@@ -35,6 +40,7 @@ class AlertsViewModel @Inject constructor(
     private val reservations: ReservationRepository,
     private val parkingLots: ParkingLotRepository,
     private val syncAlerts: SyncReservationAlertsUseCase,
+    private val syncWaitlistAlerts: SyncWaitlistAlertsUseCase,
     private val geofences: GeofenceRepository,
     private val permissionPrompts: PermissionPromptStore,
     inAppNotifications: InAppNotifications,
@@ -43,6 +49,11 @@ class AlertsViewModel @Inject constructor(
     init {
         // Por si el permiso de segundo plano se dio desde los ajustes, con la app cerrada.
         registerPendingGeofences()
+        // El aviso de "se liberó un lugar" mientras la app está abierta, por si la push no llega (T18).
+        reservations.myWaitlist()
+            .onEach { syncWaitlist(it) }
+            .catch { Log.w(TAG, "No se pudo leer la lista de espera", it) }
+            .launchIn(viewModelScope)
     }
 
     val banners: Flow<AppNotification> = inAppNotifications.messages
@@ -86,6 +97,14 @@ class AlertsViewModel @Inject constructor(
             val lots = (parkingLots.parkingLots().first() as? DataResult.Success)?.value.orEmpty()
             syncAlerts.sync(mine, lots.associateBy { it.id })
         }.onFailure { Log.w(TAG, "No se pudieron poner al día los avisos de las reservas", it) }
+    }
+
+    private suspend fun syncWaitlist(result: DataResult<List<WaitlistEntry>>) {
+        val mine = (result as? DataResult.Success)?.value ?: return
+        runCatching {
+            val lots = (parkingLots.parkingLots().first() as? DataResult.Success)?.value.orEmpty()
+            syncWaitlistAlerts.sync(mine, lots.associateBy { it.id })
+        }.onFailure { Log.w(TAG, "No se pudieron poner al día los avisos de la lista de espera", it) }
     }
 
     private companion object {

@@ -17,6 +17,7 @@ import com.sensorpark.core.ui.theme.SensorParkTheme
 import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.usecase.CancelReservationUseCase
 import com.sensorpark.domain.usecase.CreateReservationUseCase
+import com.sensorpark.domain.usecase.JoinWaitlistUseCase
 import org.junit.Rule
 import org.junit.Test
 import java.time.Clock
@@ -46,6 +47,7 @@ class ReservationScreensUiTest {
             parkingLots = parkingLots,
             users = users,
             createReservation = CreateReservationUseCase(reservations, clock),
+            enterWaitlist = JoinWaitlistUseCase(reservations, clock),
             clock = clock,
         )
         // Esta pantalla no tiene cuenta regresiva, así que el reloj automático de Compose
@@ -86,7 +88,9 @@ class ReservationScreensUiTest {
         val vm = myReservationsViewModel()
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SensorParkTheme(dynamicColor = false) { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
+            SensorParkTheme(dynamicColor = false) {
+                MyReservationsScreen(reservationId = null, onCheckIn = {}, onOpenOffer = {}, vm = vm)
+            }
         }
         compose.settle()
 
@@ -105,7 +109,9 @@ class ReservationScreensUiTest {
         val vm = myReservationsViewModel()
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SensorParkTheme(dynamicColor = false) { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
+            SensorParkTheme(dynamicColor = false) {
+                MyReservationsScreen(reservationId = null, onCheckIn = {}, onOpenOffer = {}, vm = vm)
+            }
         }
         compose.settle()
 
@@ -129,7 +135,9 @@ class ReservationScreensUiTest {
         val vm = myReservationsViewModel()
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SensorParkTheme(dynamicColor = false) { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
+            SensorParkTheme(dynamicColor = false) {
+                MyReservationsScreen(reservationId = null, onCheckIn = {}, onOpenOffer = {}, vm = vm)
+            }
         }
         compose.settle()
 
@@ -143,7 +151,9 @@ class ReservationScreensUiTest {
         val vm = myReservationsViewModel()
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SensorParkTheme(dynamicColor = false) { MyReservationsScreen(reservationId = null, onCheckIn = {}, vm = vm) }
+            SensorParkTheme(dynamicColor = false) {
+                MyReservationsScreen(reservationId = null, onCheckIn = {}, onOpenOffer = {}, vm = vm)
+            }
         }
         compose.settle()
 

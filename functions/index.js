@@ -7,8 +7,8 @@ const logger = require("firebase-functions/logger");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
-const { getMessaging } = require("firebase-admin/messaging");
 const { seed } = require("./seed");
+const { sendPush } = require("./push");
 const { affectsCounters, recountParkingLot } = require("./counters");
 const simulator = require("./simulator");
 
@@ -103,28 +103,10 @@ exports.checkIn = reservations.checkIn;
 exports.checkOut = reservations.checkOut;
 exports.joinWaitlist = reservations.joinWaitlist;
 exports.leaveWaitlist = reservations.leaveWaitlist;
+exports.acceptWaitlistOffer = reservations.acceptWaitlistOffer;
+exports.declineWaitlistOffer = reservations.declineWaitlistOffer;
+exports.offerReleasedSpots = reservations.offerReleasedSpots;
 exports.processReservations = reservations.processReservations;
-
-// Envía una push sólo `data` (todos strings) a los usuarios indicados y limpia tokens vencidos.
-async function sendPush(uids, data) {
-  const docs = await Promise.all(uids.map((uid) => db.doc(`users/${uid}`).get()));
-  const recipients = docs.filter((d) => d.exists && d.get("fcmToken"));
-  if (recipients.length === 0) return 0;
-
-  const response = await getMessaging().sendEachForMulticast({
-    tokens: recipients.map((d) => d.get("fcmToken")),
-    data,
-    // priority high para que Doze no la retenga; ttl explícito para que no llegue horas tarde.
-    android: { priority: "high", ttl: 10 * 60 * 1000 },
-  });
-
-  const expired = ["messaging/registration-token-not-registered", "messaging/invalid-registration-token"];
-  await Promise.all(response.responses.map((r, i) =>
-    !r.success && expired.includes(r.error.code)
-      ? recipients[i].ref.update({ fcmToken: FieldValue.delete() })
-      : null));
-  return response.successCount;
-}
 
 // Ejemplo del circuito de avisos: confirma al conductor que su reserva quedó registrada.
 exports.notifyReservationCreated = onDocumentCreated("reservations/{reservationId}", async (event) => {
@@ -135,7 +117,7 @@ exports.notifyReservationCreated = onDocumentCreated("reservations/{reservationI
     id: event.params.reservationId,
     title: "Reserva confirmada",
     body: "Tu lugar quedó reservado.",
-  });
+  }, "RESERVATION");
 });
 
 // La usa la pantalla de diagnóstico de la app: manda una push al propio usuario para

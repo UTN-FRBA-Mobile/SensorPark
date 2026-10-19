@@ -26,6 +26,11 @@ sealed class Route(val pattern: String) {
         fun create(reservationId: String) = "check-in/$reservationId"
     }
 
+    /** La oferta de un lugar liberado de la lista de espera; destino de `sensorpark://waitlist-offer/{id}`. */
+    data object WaitlistOffer : Route("waitlist-offer/{${DeepLinks.ARG_ENTRY_ID}}") {
+        fun create(entryId: String) = "waitlist-offer/$entryId"
+    }
+
     // Administrador de estacionamiento
     data object ManagedParkingLots : Route("parking-lots")
 

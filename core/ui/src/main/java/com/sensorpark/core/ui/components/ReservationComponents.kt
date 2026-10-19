@@ -44,6 +44,12 @@ fun formatDuration(duration: Duration): String {
     return if (hours > 0) "$hours h ${minutes.toString().padStart(2, '0')} min" else "$minutes min"
 }
 
+/** "4:59": la cuenta regresiva de los minutos que dura una oferta de la lista de espera. */
+fun formatCountdown(duration: Duration): String {
+    val seconds = duration.seconds.coerceAtLeast(0)
+    return "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+}
+
 /** "1 h" o "30 min", para los chips de duración. */
 fun formatDurationMinutes(minutes: Int): String =
     if (minutes >= 60 && minutes % 60 == 0) "${minutes / 60} h" else "$minutes min"
@@ -69,6 +75,8 @@ fun ReservationRejection.message(): String = stringResource(
         ReservationRejection.INVALID_STATUS -> R.string.rejection_invalid_status
         ReservationRejection.ALREADY_IN_WAITLIST -> R.string.rejection_already_in_waitlist
         ReservationRejection.SPOT_NOT_TAKEN -> R.string.rejection_spot_not_taken
+        ReservationRejection.NO_OFFER -> R.string.rejection_no_offer
+        ReservationRejection.OFFER_EXPIRED -> R.string.rejection_offer_expired
     },
 )
 

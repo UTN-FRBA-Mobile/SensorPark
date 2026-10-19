@@ -2,6 +2,7 @@ package com.sensorpark.feature.reservations
 
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeReservationRepository
+import com.sensorpark.core.testing.Samples
 import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.DataErrorReason
 import com.sensorpark.domain.model.ParkingLot
@@ -9,6 +10,7 @@ import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.model.SpotType
+import com.sensorpark.domain.model.WaitlistStatus
 import com.sensorpark.domain.usecase.CancelReservationUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,6 +24,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -151,6 +154,38 @@ class MyReservationsViewModelTest {
         collecting(vm)
 
         assertEquals(DataErrorReason.PERMISSION_DENIED, vm.state.value.failure)
+    }
+
+    @Test
+    fun muestraLasListasDeEsperaAbiertasConSuOfertaYDejaSalir() = runTest {
+        val world = World()
+        world.reservations.emitWaitlist(
+            listOf(
+                Samples.waitlistEntry("esperando", position = 2, arrivesAt = NOW.plus(Duration.ofHours(3))),
+                Samples.waitlistEntry(
+                    "con-oferta",
+                    status = WaitlistStatus.OFFERED,
+                    arrivesAt = NOW.plus(Duration.ofHours(2)),
+                    offerExpiresAt = NOW.plus(Duration.ofMinutes(3)),
+                ),
+                Samples.waitlistEntry("salio", status = WaitlistStatus.LEFT),
+            ),
+        )
+        val vm = world.viewModel()
+        collecting(vm)
+
+        // Sólo las abiertas, por hora de llegada, con el nombre del estacionamiento.
+        val cards = vm.state.value.waitlist
+        assertEquals(listOf("con-oferta", "esperando"), cards.map { it.entry.id })
+        assertEquals("UTN Medrano", cards.first().parkingLotName)
+        assertEquals(Duration.ofMinutes(3), cards.first().offerTimeLeft(NOW))
+        assertEquals(Duration.ZERO, cards.last().offerTimeLeft(NOW))
+        assertFalse("con una lista de espera no está vacía", vm.state.value.isEmpty)
+
+        vm.leaveWaitlist(cards.last().entry)
+
+        assertEquals(listOf("esperando"), world.reservations.left)
+        assertEquals(listOf("con-oferta"), vm.state.value.waitlist.map { it.entry.id })
     }
 
     private class World {

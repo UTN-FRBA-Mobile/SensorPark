@@ -58,6 +58,7 @@ import com.sensorpark.feature.map.MapScreen
 import com.sensorpark.feature.parking.ParkingLotDetailScreen
 import com.sensorpark.feature.reservations.MyReservationsScreen
 import com.sensorpark.feature.reservations.ReserveScreen
+import com.sensorpark.feature.reservations.WaitlistOfferScreen
 
 /** Raíz de la UI: según la sesión muestra el ingreso o la app. */
 @Composable
@@ -209,6 +210,17 @@ private fun NavGraphBuilder.reservationsTab(nav: NavHostController) {
             MyReservationsScreen(
                 reservationId = entry.arguments?.getString(DeepLinks.ARG_RESERVATION_ID),
                 onCheckIn = { nav.navigate(Route.CheckIn.create(it)) },
+                onOpenOffer = { nav.navigate(Route.WaitlistOffer.create(it)) },
+            )
+        }
+        // El aviso de "se liberó un lugar" abre acá, con sensorpark://waitlist-offer/{id} (T18).
+        composable(
+            route = Route.WaitlistOffer.pattern,
+            deepLinks = listOf(navDeepLink { uriPattern = DeepLinks.WAITLIST_OFFER }),
+        ) { entry ->
+            WaitlistOfferScreen(
+                entryId = entry.arguments?.getString(DeepLinks.ARG_ENTRY_ID).orEmpty(),
+                onOpenMyReservations = { nav.openTabAtStart(Tab.RESERVATIONS) },
             )
         }
         // El aviso de llegada abre acá directamente, con sensorpark://check-in/{id}.
