@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,6 +24,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -68,18 +74,23 @@ fun AppNavigation(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
 
-    when (val current = state) {
-        null -> Loading()
-        SessionState.SignedOut -> AuthNavigation()
-        is SessionState.SignedIn -> {
-            val role = current.role
-            if (role == null) {
-                Loading(message = stringResource(R.string.session_preparing), onSignOut = vm::signOut)
-            } else {
-                // Recién con el rol asignado: si el token se guardara antes, podría crear el documento
-                // del usuario antes que el registro, y el rol pedido se perdería.
-                RegisterDevice(vm::registerDevice)
-                MainNavigation(current, role, pendingDeepLink, onDeepLinkHandled, onSignOut = vm::signOut)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        when (val current = state) {
+            null -> Loading()
+            SessionState.SignedOut -> AuthNavigation()
+            is SessionState.SignedIn -> {
+                val role = current.role
+                if (role == null) {
+                    Loading(message = stringResource(R.string.session_preparing), onSignOut = vm::signOut)
+                } else {
+                    // Recién con el rol asignado: si el token se guardara antes, podría crear el documento
+                    // del usuario antes que el registro, y el rol pedido se perdería.
+                    RegisterDevice(vm::registerDevice)
+                    MainNavigation(current, role, pendingDeepLink, onDeepLinkHandled, onSignOut = vm::signOut)
+                }
             }
         }
     }
@@ -129,7 +140,20 @@ private fun MainNavigation(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            NavigationBar {
+            val borderColor = MaterialTheme.colorScheme.outlineVariant
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
+                modifier = Modifier.drawBehind {
+                    val strokeWidth = 1.dp.toPx()
+                    drawLine(
+                        color = borderColor,
+                        start = Offset(0f, 0f),
+                        end = Offset(size.width, 0f),
+                        strokeWidth = strokeWidth,
+                    )
+                },
+            ) {
                 tabs.forEach { tab ->
                     val selected = destination?.hierarchy?.any { it.route == tab.graph } == true
                     NavigationBarItem(
@@ -138,7 +162,19 @@ private fun MainNavigation(
                         // cualquier app: si no, desde el check-in no había forma de llegar a la lista.
                         onClick = { if (selected) nav.goToTabStart(tab) else nav.navigateToTab(tab) },
                         icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(stringResource(tab.label)) },
+                        label = {
+                            Text(
+                                text = stringResource(tab.label),
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            )
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        ),
                     )
                 }
             }
