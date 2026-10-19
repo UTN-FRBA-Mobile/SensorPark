@@ -33,18 +33,22 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sensorpark.core.ui.components.ErrorContent
 import com.sensorpark.core.ui.components.LoadingContent
 import com.sensorpark.core.ui.components.ReservationStatusBadge
+import com.sensorpark.core.ui.components.formatCountdown
 import com.sensorpark.core.ui.components.formatDateAndTime
 import com.sensorpark.core.ui.components.formatDuration
 import com.sensorpark.core.ui.components.formatTime
+import com.sensorpark.core.ui.components.label
 import com.sensorpark.core.ui.components.message
 import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationStatus
+import com.sensorpark.domain.model.WaitlistStatus
 import kotlinx.coroutines.delay
 import java.time.Instant
 
 /**
  * Pestaña "Mis reservas" (CU-09): arriba la reserva que está pasando con sus acciones, después las
- * próximas y el historial. El deep link `sensorpark://reservation/{id}` la abre destacando una.
+ * próximas, las listas de espera y el historial. El deep link `sensorpark://reservation/{id}` la
+ * abre destacando una.
  *
  * @param reservationId la reserva a destacar cuando se llega por el deep link.
  */
@@ -52,6 +56,7 @@ import java.time.Instant
 fun MyReservationsScreen(
     reservationId: String?,
     onCheckIn: (reservationId: String) -> Unit,
+    onOpenOffer: (entryId: String) -> Unit,
     vm: MyReservationsViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -112,6 +117,19 @@ fun MyReservationsScreen(
                                 enabled = !state.working,
                             ) { Text(stringResource(R.string.my_reservations_cancel)) }
                         },
+                    )
+                }
+            }
+
+            if (state.waitlist.isNotEmpty()) {
+                Text(stringResource(R.string.my_reservations_waitlist), style = MaterialTheme.typography.titleSmall)
+                state.waitlist.forEach { card ->
+                    WaitlistRow(
+                        card = card,
+                        now = now,
+                        working = state.working,
+                        onOpenOffer = { onOpenOffer(card.entry.id) },
+                        onLeave = { vm.leaveWaitlist(card.entry) },
                     )
                 }
             }
@@ -233,6 +251,51 @@ private fun Header(card: ReservationCard, highlighted: Boolean) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
         )
+    }
+}
+
+/** Una lista de espera: en qué lugar de la fila está o, si se liberó un lugar, la oferta. */
+@Composable
+private fun WaitlistRow(
+    card: WaitlistCard,
+    now: Instant,
+    working: Boolean,
+    onOpenOffer: () -> Unit,
+    onLeave: () -> Unit,
+) {
+    val entry = card.entry
+    val offer = entry.offer
+    val offerLeft = card.offerTimeLeft(now)
+    val offered = entry.status == WaitlistStatus.OFFERED && !offerLeft.isZero
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(card.parkingLotName, style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(
+                    R.string.my_reservations_waitlist_slot,
+                    entry.spotType.label(),
+                    formatDateAndTime(entry.arrivesAt),
+                    formatTime(entry.endsAt),
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (offer != null && offered) {
+                Text(
+                    stringResource(R.string.my_reservations_waitlist_offer, offer.spotCode, formatCountdown(offerLeft)),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Button(onClick = onOpenOffer, enabled = !working, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.my_reservations_waitlist_see_offer))
+                }
+            } else {
+                entry.position?.let { Text(stringResource(R.string.my_reservations_waitlist_position, it)) }
+                TextButton(onClick = onLeave, enabled = !working) {
+                    Text(stringResource(R.string.my_reservations_waitlist_leave))
+                }
+            }
+        }
     }
 }
 

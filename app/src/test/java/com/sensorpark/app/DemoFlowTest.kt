@@ -19,6 +19,7 @@ import com.sensorpark.domain.usecase.CancelReservationUseCase
 import com.sensorpark.domain.usecase.CheckInUseCase
 import com.sensorpark.domain.usecase.CheckOutUseCase
 import com.sensorpark.domain.usecase.CreateReservationUseCase
+import com.sensorpark.domain.usecase.JoinWaitlistUseCase
 import com.sensorpark.domain.usecase.ReassignSpotUseCase
 import com.sensorpark.domain.usecase.SyncReservationAlertsUseCase
 import com.sensorpark.feature.checkin.CheckInMessage
@@ -98,6 +99,7 @@ class DemoFlowTest {
         parkingLots = parkingLots,
         users = users,
         createReservation = CreateReservationUseCase(reservations, clock),
+        enterWaitlist = JoinWaitlistUseCase(reservations, clock),
         clock = clock,
     )
 

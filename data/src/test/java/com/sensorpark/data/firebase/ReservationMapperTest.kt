@@ -1,8 +1,10 @@
 package com.sensorpark.data.firebase
 
 import com.google.firebase.Timestamp
+import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.model.SpotType
+import com.sensorpark.domain.model.WaitlistStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -64,5 +66,54 @@ class ReservationMapperTest {
         )!!
         assertEquals(arrivesAt, confirmation.arrivesAt)
         assertEquals(Instant.parse("2026-10-19T17:00:00Z"), confirmation.endsAt)
+    }
+
+    @Test
+    fun `convierte una entrada de la lista de espera con su oferta`() {
+        val offeredAt = Instant.parse("2026-10-19T15:00:00Z")
+        val entry = waitlistEntryFrom(
+            "w1",
+            mapOf(
+                "userId" to "ana",
+                "parkingLotId" to "utn-medrano",
+                "spotType" to "MOTORCYCLE",
+                "arrivesAt" to ts(arrivesAt),
+                "durationMinutes" to 60L,
+                "category" to "PREGNANT",
+                "requestedAt" to ts(offeredAt.minusSeconds(600)),
+                "status" to "OFFERED",
+                "offer" to mapOf(
+                    "spotId" to "m1",
+                    "spotCode" to "M1",
+                    "offeredAt" to ts(offeredAt),
+                    "expiresAt" to ts(offeredAt.plusSeconds(300)),
+                ),
+            ),
+        )!!
+
+        assertEquals(WaitlistStatus.OFFERED, entry.status)
+        assertEquals(SpotType.MOTORCYCLE, entry.spotType)
+        assertEquals(Category.PREGNANT, entry.category)
+        assertEquals("M1", entry.offer?.spotCode)
+        assertEquals(offeredAt.plusSeconds(300), entry.offer?.expiresAt)
+        assertEquals(arrivesAt.plusSeconds(3600), entry.endsAt)
+        assertNull(entry.position)
+    }
+
+    @Test
+    fun `una entrada esperando trae su posicion, y sin estado conocido se descarta`() {
+        val waiting = mapOf(
+            "userId" to "ana",
+            "parkingLotId" to "utn-medrano",
+            "spotType" to "STANDARD",
+            "arrivesAt" to ts(arrivesAt),
+            "durationMinutes" to 60L,
+            "requestedAt" to ts(arrivesAt.minusSeconds(3600)),
+            "status" to "WAITING",
+            "position" to 3L,
+        )
+        assertEquals(3, waitlistEntryFrom("w1", waiting)?.position)
+        assertNull(waitlistEntryFrom("w1", waiting)?.offer)
+        assertNull(waitlistEntryFrom("w1", waiting + ("status" to "PAUSED")))
     }
 }

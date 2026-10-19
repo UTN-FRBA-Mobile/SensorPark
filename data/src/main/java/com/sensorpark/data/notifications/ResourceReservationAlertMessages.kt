@@ -6,6 +6,7 @@ import com.sensorpark.domain.model.ActiveGeofence
 import com.sensorpark.domain.model.AppNotification
 import com.sensorpark.domain.model.NotificationAction
 import com.sensorpark.domain.model.NotificationType
+import com.sensorpark.domain.model.WaitlistEntry
 import com.sensorpark.domain.navigation.DeepLinks
 import com.sensorpark.domain.notification.ReservationAlertMessages
 import com.sensorpark.domain.reservation.ReservationRules
@@ -87,6 +88,22 @@ class ResourceReservationAlertMessages @Inject constructor(
 
     override fun preArrivalKeys(reservationId: String) =
         listOf(confirmedKey(reservationId), reminderKey(reservationId), arrivalKey(reservationId))
+
+    override fun waitlistOffer(entry: WaitlistEntry, parkingLotName: String) = AppNotification(
+        type = NotificationType.WAITLIST,
+        key = waitlistOfferKey(entry.id),
+        title = context.getString(R.string.notification_waitlist_offer_title, parkingLotName),
+        body = context.getString(
+            R.string.notification_waitlist_offer_body,
+            entry.offer?.spotCode.orEmpty(),
+            moment(entry.arrivesAt),
+            TIME.format(entry.endsAt),
+        ),
+        deepLink = DeepLinks.waitlistOffer(entry.id),
+    )
+
+    // La misma que arma SensorParkMessagingService con la push del backend: `type` + `id`.
+    override fun waitlistOfferKey(entryId: String) = "waitlist_offer$entryId"
 
     private fun confirmedKey(reservationId: String) = "reservationConfirmed$reservationId"
 

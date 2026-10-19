@@ -12,6 +12,7 @@ import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.model.SpotStatus
 import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.model.WaitlistEntry
+import com.sensorpark.domain.model.WaitlistStatus
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -155,4 +156,14 @@ object ReservationRules {
     /** Orden de la lista de espera: primero las categorías especiales, después por hora de pedido. */
     val waitlistOrder: Comparator<WaitlistEntry> =
         compareBy<WaitlistEntry> { if (it.category == Category.STANDARD) 1 else 0 }.thenBy { it.requestedAt }
+
+    /** Motivo por el que no se puede aceptar ni rechazar la oferta, o null. Igual que `offerProblem` en JS. */
+    fun offerProblem(entry: WaitlistEntry, now: Instant): ReservationRejection? {
+        val offer = entry.offer
+        return when {
+            entry.status != WaitlistStatus.OFFERED || offer == null -> ReservationRejection.NO_OFFER
+            now > offer.expiresAt -> ReservationRejection.OFFER_EXPIRED
+            else -> null
+        }
+    }
 }

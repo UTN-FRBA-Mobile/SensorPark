@@ -6,7 +6,7 @@ const assert = require("node:assert/strict");
 const { initializeApp, deleteApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, GeoPoint, Timestamp } = require("firebase-admin/firestore");
-const { processReservationsAt } = require("../reservations");
+const { processReservationsAt, reconcileWaitlist } = require("../reservations");
 
 const PROJECT = process.env.GCLOUD_PROJECT || "demo-sensorpark";
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
@@ -389,6 +389,8 @@ describe("lista de espera", () => {
     const lotId = await parkingLot();
     const arrivesAt = inMinutes(120);
     const slot = { parkingLotId: lotId, arrivesAt, durationMinutes: 60, spotType: "STANDARD" };
+    // El único lugar ya está reservado para esa franja: si no, anotarse le ofrece el lugar en el acto.
+    await reserve(await user(), lotId, { arrivesAt });
     const standard = await user();
     const pregnant = await user("DRIVER", "PREGNANT");
 
@@ -422,5 +424,218 @@ describe("lista de espera", () => {
     const { result } = await call("joinWaitlist",
       { parkingLotId: await parkingLot(), arrivesAt: inMinutes(120), durationMinutes: 60, spotType: "STANDARD" }, owner);
     assertRejected(await call("leaveWaitlist", { entryId: result.entryId }, await user()), "PERMISSION_DENIED");
+  });
+});
+
+describe("oferta de la lista de espera", () => {
+  const entryOf = async (id) => (await db.doc(`waitlist/${id}`).get()).data();
+
+  // La oferta al liberarse un lugar la dispara un trigger: llega un instante después.
+  async function waitForEntry(id, predicate, what) {
+    for (let i = 0; i < 80; i++) {
+      const data = await entryOf(id);
+      if (predicate(data)) return data;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw new Error(`La entrada ${id} nunca llegó a ${what}: quedó ${JSON.stringify(await entryOf(id))}`);
+  }
+  const offered = (id) => waitForEntry(id, (entry) => entry.status === "OFFERED", "OFFERED");
+
+  // Un estacionamiento con un solo lugar, ya reservado para la franja: el que llega va a la fila.
+  async function fullLot(arrivesAt = inMinutes(120)) {
+    const lotId = await parkingLot();
+    const holder = await user();
+    const { result } = await reserve(holder, lotId, { arrivesAt });
+    const slot = { parkingLotId: lotId, arrivesAt, durationMinutes: 60, spotType: "STANDARD" };
+    return { lotId, holder, reservationId: result.reservationId, slot };
+  }
+
+  const join = async (slot, who) => (await call("joinWaitlist", slot, who)).result.entryId;
+  const cancel = (reservationId, who) => call("cancelReservation", { reservationId }, who);
+
+  test("al liberarse el lugar, el primero de la fila recibe la oferta por 5 minutos", async () => {
+    const { holder, reservationId, slot } = await fullLot();
+    const entryId = await join(slot, await user());
+    assert.equal((await entryOf(entryId)).status, "WAITING");
+    assert.equal((await entryOf(entryId)).position, 1);
+
+    const before = Date.now();
+    await cancel(reservationId, holder);
+    const entry = await offered(entryId);
+
+    assert.equal(entry.offer.spotCode, "01");
+    const minutes = (entry.offer.expiresAt.toDate() - before) / MINUTE;
+    assert.ok(minutes > 4.5 && minutes < 5.5, `la oferta dura 5 minutos, no ${minutes}`);
+  });
+
+  test("con categoría de prioridad recibe la oferta primero aunque se haya anotado después", async () => {
+    const { holder, reservationId, slot } = await fullLot();
+    const standard = await join(slot, await user());
+    const pregnant = await join(slot, await user("DRIVER", "PREGNANT"));
+    assert.equal((await entryOf(pregnant)).position, 1, "pasa adelante en la fila");
+    assert.equal((await entryOf(standard)).position, 2);
+
+    await cancel(reservationId, holder);
+    await offered(pregnant);
+
+    const waiting = await entryOf(standard);
+    assert.equal(waiting.status, "WAITING");
+    assert.equal(waiting.position, 1, "el que quedó pasa a ser el primero");
+  });
+
+  test("mientras dura la oferta, nadie más puede reservar ese lugar", async () => {
+    const { lotId, holder, reservationId, slot } = await fullLot();
+    const entryId = await join(slot, await user());
+    await cancel(reservationId, holder);
+    await offered(entryId);
+
+    assertRejected(await reserve(await user(), lotId, { arrivesAt: slot.arrivesAt }),
+      "FAILED_PRECONDITION", "NO_SPOTS");
+  });
+
+  test("aceptar la convierte en una reserva confirmada con esa franja", async () => {
+    const { holder, reservationId, slot } = await fullLot();
+    const waiter = await user();
+    const entryId = await join(slot, waiter);
+    await cancel(reservationId, holder);
+    await offered(entryId);
+
+    const { result } = await call("acceptWaitlistOffer", { entryId }, waiter);
+    assert.equal(result.spotCode, "01");
+    assert.equal(result.arrivesAt, slot.arrivesAt);
+
+    const reservation = (await db.doc(`reservations/${result.reservationId}`).get()).data();
+    assert.equal(reservation.status, "CONFIRMED");
+    assert.equal(reservation.userId, waiter.uid);
+    assert.equal(reservation.durationMinutes, 60);
+    assert.equal(reservation.fromWaitlist, entryId);
+
+    const entry = await entryOf(entryId);
+    assert.equal(entry.status, "ACCEPTED");
+    assert.equal(entry.reservationId, result.reservationId);
+  });
+
+  test("rechazar pasa el lugar al siguiente de la fila", async () => {
+    const { holder, reservationId, slot } = await fullLot();
+    const first = await user();
+    const firstEntry = await join(slot, first);
+    const secondEntry = await join(slot, await user());
+    await cancel(reservationId, holder);
+    await offered(firstEntry);
+
+    assert.deepEqual((await call("declineWaitlistOffer", { entryId: firstEntry }, first)).result,
+      { status: "DECLINED" });
+    assert.equal((await entryOf(firstEntry)).status, "DECLINED");
+    await offered(secondEntry);
+  });
+
+  test("si nadie contesta, el proceso de cada minuto se la pasa al siguiente", async () => {
+    const { holder, reservationId, slot } = await fullLot();
+    const firstEntry = await join(slot, await user());
+    const secondEntry = await join(slot, await user());
+    await cancel(reservationId, holder);
+    await offered(firstEntry);
+
+    // Seis minutos después: se pasaron los cinco de la oferta.
+    await processReservationsAt(db, new Date(Date.now() + 6 * MINUTE));
+
+    const missed = await entryOf(firstEntry);
+    assert.equal(missed.status, "DECLINED");
+    assert.equal(missed.missed, true);
+    assert.equal((await entryOf(secondEntry)).status, "OFFERED");
+  });
+
+  test("aceptar una oferta vencida: OFFER_EXPIRED", async () => {
+    const { holder, reservationId, slot } = await fullLot();
+    const waiter = await user();
+    const entryId = await join(slot, waiter);
+    await cancel(reservationId, holder);
+    await offered(entryId);
+    // Como si hubieran pasado los cinco minutos sin que corriera todavía el proceso.
+    await db.doc(`waitlist/${entryId}`).update({ "offer.expiresAt": Timestamp.fromDate(new Date(Date.now() - MINUTE)) });
+
+    assertRejected(await call("acceptWaitlistOffer", { entryId }, waiter), "FAILED_PRECONDITION", "OFFER_EXPIRED");
+  });
+
+  test("aceptar o rechazar sin oferta: NO_OFFER", async () => {
+    const { slot } = await fullLot();
+    const waiter = await user();
+    const entryId = await join(slot, waiter);
+    assertRejected(await call("acceptWaitlistOffer", { entryId }, waiter), "FAILED_PRECONDITION", "NO_OFFER");
+    assertRejected(await call("declineWaitlistOffer", { entryId }, waiter), "FAILED_PRECONDITION", "NO_OFFER");
+  });
+
+  test("con dos reservas activas no puede aceptar: LIMIT_REACHED", async () => {
+    const { holder, reservationId, slot } = await fullLot();
+    const waiter = await user();
+    const entryId = await join(slot, waiter);
+    const elsewhere = await parkingLot({ "01": "STANDARD", "02": "STANDARD" });
+    assert.ok((await reserve(waiter, elsewhere, { arrivesAt: inMinutes(300) })).result);
+    assert.ok((await reserve(waiter, elsewhere, { arrivesAt: inMinutes(420) })).result);
+    await cancel(reservationId, holder);
+    await offered(entryId);
+
+    assertRejected(await call("acceptWaitlistOffer", { entryId }, waiter), "FAILED_PRECONDITION", "LIMIT_REACHED");
+  });
+
+  test("otro usuario no acepta una oferta ajena", async () => {
+    const { holder, reservationId, slot } = await fullLot();
+    const entryId = await join(slot, await user());
+    await cancel(reservationId, holder);
+    await offered(entryId);
+    assertRejected(await call("acceptWaitlistOffer", { entryId }, await user()), "PERMISSION_DENIED");
+  });
+
+  test("salir de la fila con una oferta pendiente la suelta para el siguiente", async () => {
+    const { holder, reservationId, slot } = await fullLot();
+    const first = await user();
+    const firstEntry = await join(slot, first);
+    const secondEntry = await join(slot, await user());
+    await cancel(reservationId, holder);
+    await offered(firstEntry);
+
+    await call("leaveWaitlist", { entryId: firstEntry }, first);
+
+    assert.equal((await entryOf(firstEntry)).status, "LEFT");
+    await offered(secondEntry);
+  });
+
+  test("las posiciones se actualizan cuando alguien sale", async () => {
+    const { slot } = await fullLot();
+    const a = await user();
+    const aEntry = await join(slot, a);
+    const bEntry = await join(slot, await user());
+    const cEntry = await join(slot, await user());
+    assert.deepEqual([(await entryOf(aEntry)).position, (await entryOf(bEntry)).position,
+      (await entryOf(cEntry)).position], [1, 2, 3]);
+
+    await call("leaveWaitlist", { entryId: aEntry }, a);
+
+    assert.equal((await entryOf(bEntry)).position, 1);
+    assert.equal((await entryOf(cEntry)).position, 2);
+  });
+
+  test("con una oferta pendiente no se puede anotar de nuevo para la misma franja", async () => {
+    const { holder, reservationId, slot } = await fullLot();
+    const waiter = await user();
+    const entryId = await join(slot, waiter);
+    await cancel(reservationId, holder);
+    await offered(entryId);
+    assertRejected(await call("joinWaitlist", slot, waiter), "FAILED_PRECONDITION", "ALREADY_IN_WAITLIST");
+  });
+
+  test("si al anotarse ya había lugar, la oferta sale en el acto", async () => {
+    const lotId = await parkingLot();
+    const entryId = await join(
+      { parkingLotId: lotId, arrivesAt: inMinutes(120), durationMinutes: 60, spotType: "STANDARD" }, await user());
+    assert.equal((await entryOf(entryId)).status, "OFFERED");
+  });
+
+  test("una entrada cuya franja ya empezó vence al repasar la fila", async () => {
+    const { lotId, slot } = await fullLot();
+    const entryId = await join(slot, await user());
+    // Tres horas después: la franja pedida (en dos horas) ya empezó.
+    await reconcileWaitlist(db, lotId, new Date(Date.now() + 3 * 60 * MINUTE));
+    assert.equal((await entryOf(entryId)).status, "EXPIRED");
   });
 });

@@ -11,6 +11,7 @@ import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.Schedule
 import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.usecase.CreateReservationUseCase
+import com.sensorpark.domain.usecase.JoinWaitlistUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -144,6 +145,41 @@ class ReserveViewModelTest {
         assertNull(vm.state.value.rejection)
     }
 
+    @Test
+    fun sinLugarSePuedeAnotarEnLaListaDeEsperaConElMismoPedido() = runTest {
+        val world = World()
+        world.reservations.createResult = ReservationOutcome.Rejected(ReservationRejection.NO_SPOTS)
+        val vm = world.viewModel()
+        collecting(vm)
+        vm.load(LOT.id)
+
+        vm.setTime(LocalTime.of(15, 30))
+        vm.confirm()
+        assertTrue(vm.state.value.canJoinWaitlist)
+
+        vm.joinWaitlist()
+
+        val request = world.reservations.joined.single()
+        assertEquals(world.reservations.created.single(), request)
+        assertEquals(1, vm.state.value.waitlist?.position)
+        // Ya anotado: el error se va y no se ofrece anotarse de nuevo.
+        assertNull(vm.state.value.rejection)
+        assertFalse(vm.state.value.canJoinWaitlist)
+    }
+
+    @Test
+    fun conOtroRechazoNoSeOfreceLaListaDeEspera() = runTest {
+        val world = World()
+        world.reservations.createResult = ReservationOutcome.Rejected(ReservationRejection.LIMIT_REACHED)
+        val vm = world.viewModel()
+        collecting(vm)
+        vm.load(LOT.id)
+
+        vm.confirm()
+
+        assertFalse(vm.state.value.canJoinWaitlist)
+    }
+
     private class World(category: Category = Category.STANDARD) {
         // 14:00Z es el mediodía de Buenos Aires: la franja por defecto cae dentro del horario.
         val clock: Clock = Clock.fixed(Instant.parse("2026-10-18T14:00:00Z"), ZoneOffset.UTC)
@@ -155,6 +191,7 @@ class ReserveViewModelTest {
             parkingLots = parkingLots,
             users = users,
             createReservation = CreateReservationUseCase(reservations, clock),
+            enterWaitlist = JoinWaitlistUseCase(reservations, clock),
             clock = clock,
         )
     }

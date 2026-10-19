@@ -18,7 +18,11 @@ import com.sensorpark.domain.model.ReservationRequest
 import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.model.SpotAvailability
 import com.sensorpark.domain.model.SpotReassignment
+import com.sensorpark.domain.model.SpotType
+import com.sensorpark.domain.model.WaitlistEntry
+import com.sensorpark.domain.model.WaitlistOffer
 import com.sensorpark.domain.model.WaitlistPosition
+import com.sensorpark.domain.model.WaitlistStatus
 import com.sensorpark.domain.repository.GeofenceRepository
 import com.sensorpark.domain.repository.LocationRepository
 import com.sensorpark.domain.repository.NotificationPreferencesRepository
@@ -27,6 +31,7 @@ import com.sensorpark.domain.repository.ReminderScheduler
 import com.sensorpark.domain.repository.ReservationRepository
 import com.sensorpark.domain.repository.SpotAvailabilityRepository
 import com.sensorpark.domain.repository.UserRepository
+import com.sensorpark.domain.reservation.ReservationRules
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,6 +50,7 @@ import java.time.Instant
  */
 class FakeReservationRepository(
     reservations: List<Reservation> = emptyList(),
+    waitlist: List<WaitlistEntry> = emptyList(),
     private val clock: () -> Instant = { Samples.NOW },
 ) : ReservationRepository {
 
@@ -67,6 +73,19 @@ class FakeReservationRepository(
     var spotCodeToAssign: String = "07"
 
     val current: List<Reservation> get() = (state.value as? DataResult.Success)?.value.orEmpty()
+
+    // La lista de espera: anotarse deja la entrada esperando; la oferta la hace el test con [offer].
+    private val waitlistState = MutableStateFlow<DataResult<List<WaitlistEntry>>>(DataResult.Success(waitlist))
+
+    val joined = mutableListOf<ReservationRequest>()
+    val left = mutableListOf<String>()
+    val accepted = mutableListOf<String>()
+    val declined = mutableListOf<String>()
+    var joinResult: ReservationOutcome<WaitlistPosition>? = null
+    var acceptResult: ReservationOutcome<ReservationConfirmation>? = null
+    var declineResult: ReservationOutcome<Unit>? = null
+
+    val waitlistEntries: List<WaitlistEntry> get() = (waitlistState.value as? DataResult.Success)?.value.orEmpty()
 
     fun emit(reservations: List<Reservation>) {
         state.value = DataResult.Success(reservations)
@@ -159,10 +178,93 @@ class FakeReservationRepository(
         return ReservationOutcome.Success(summary)
     }
 
-    override suspend fun joinWaitlist(request: ReservationRequest): ReservationOutcome<WaitlistPosition> =
-        ReservationOutcome.Success(WaitlistPosition(entryId = "w-1", position = 1))
+    override suspend fun joinWaitlist(request: ReservationRequest): ReservationOutcome<WaitlistPosition> {
+        joined += request
+        joinResult?.let { return it }
+        val waiting = waitlistEntries.count { it.status == WaitlistStatus.WAITING }
+        val entry = Samples.waitlistEntry(
+            id = "w-${joined.size}",
+            arrivesAt = request.arrivesAt,
+            durationMinutes = request.durationMinutes,
+            position = waiting + 1,
+        ).copy(parkingLotId = request.parkingLotId, spotType = request.spotType ?: SpotType.STANDARD)
+        updateWaitlist { listOf(entry) + it }
+        return ReservationOutcome.Success(WaitlistPosition(entryId = entry.id, position = entry.position ?: 1))
+    }
 
-    override suspend fun leaveWaitlist(entryId: String): ReservationOutcome<Unit> = ReservationOutcome.Success(Unit)
+    override suspend fun leaveWaitlist(entryId: String): ReservationOutcome<Unit> {
+        left += entryId
+        changeWaitlistStatus(entryId, WaitlistStatus.LEFT)
+        return ReservationOutcome.Success(Unit)
+    }
+
+    override fun myWaitlist(): Flow<DataResult<List<WaitlistEntry>>> = waitlistState.asStateFlow()
+
+    override suspend fun acceptWaitlistOffer(entryId: String): ReservationOutcome<ReservationConfirmation> {
+        accepted += entryId
+        acceptResult?.let { return it }
+        val entry = waitlistEntries.first { it.id == entryId }
+        val reservation = Samples.reservation(
+            id = "res-from-$entryId",
+            arrivesAt = entry.arrivesAt,
+            durationMinutes = entry.durationMinutes,
+            spotCode = entry.offer?.spotCode ?: spotCodeToAssign,
+        )
+        update { it + reservation }
+        updateWaitlist { list ->
+            list.map {
+                if (it.id == entryId) {
+                    it.copy(status = WaitlistStatus.ACCEPTED, reservationId = reservation.id)
+                } else {
+                    it
+                }
+            }
+        }
+        return ReservationOutcome.Success(
+            ReservationConfirmation(
+                reservationId = reservation.id,
+                spotId = reservation.spotId,
+                spotCode = reservation.spotCode,
+                arrivesAt = reservation.arrivesAt,
+                endsAt = reservation.endsAt,
+                toleranceUntil = reservation.toleranceUntil,
+            ),
+        )
+    }
+
+    override suspend fun declineWaitlistOffer(entryId: String): ReservationOutcome<Unit> {
+        declined += entryId
+        declineResult?.let { return it }
+        changeWaitlistStatus(entryId, WaitlistStatus.DECLINED)
+        return ReservationOutcome.Success(Unit)
+    }
+
+    /** Lo que haría el backend al liberarse un lugar: le ofrece [spotCode] a esa entrada. */
+    fun offer(entryId: String, spotCode: String = "07") {
+        val now = clock()
+        val offer = WaitlistOffer(
+            spotId = "spot-$spotCode",
+            spotCode = spotCode,
+            offeredAt = now,
+            expiresAt = now.plus(ReservationRules.WAITLIST_OFFER_TIME),
+        )
+        updateWaitlist { list ->
+            list.map {
+                if (it.id == entryId) it.copy(status = WaitlistStatus.OFFERED, position = null, offer = offer) else it
+            }
+        }
+    }
+
+    fun emitWaitlist(entries: List<WaitlistEntry>) {
+        waitlistState.value = DataResult.Success(entries)
+    }
+
+    private fun changeWaitlistStatus(entryId: String, status: WaitlistStatus) =
+        updateWaitlist { list -> list.map { if (it.id == entryId) it.copy(status = status, position = null) else it } }
+
+    private fun updateWaitlist(transform: (List<WaitlistEntry>) -> List<WaitlistEntry>) {
+        waitlistState.update { DataResult.Success(transform((it as? DataResult.Success)?.value.orEmpty())) }
+    }
 
     private fun changeStatus(reservationId: String, status: ReservationStatus) =
         update { list -> list.map { if (it.id == reservationId) it.copy(status = status) else it } }
@@ -351,4 +453,13 @@ object FakeAlertMessages : com.sensorpark.domain.notification.ReservationAlertMe
 
     override fun preArrivalKeys(reservationId: String) =
         listOf("reservationConfirmed$reservationId", "reminder$reservationId", "arrival$reservationId")
+
+    override fun waitlistOffer(entry: WaitlistEntry, parkingLotName: String) = AppNotification(
+        type = NotificationType.WAITLIST,
+        key = waitlistOfferKey(entry.id),
+        title = "Se liberó un lugar en $parkingLotName",
+        body = "Lugar ${entry.offer?.spotCode}",
+    )
+
+    override fun waitlistOfferKey(entryId: String) = "waitlist_offer$entryId"
 }
