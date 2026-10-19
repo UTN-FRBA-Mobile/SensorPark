@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SensorPark</string>
+    <string name="app_tagline">Gestión Inteligente de Estacionamientos</string>
 
     <!-- Pestañas -->
     <string name="tab_search">Buscar</string>
