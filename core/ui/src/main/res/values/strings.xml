@@ -25,6 +25,7 @@
     <string name="action_save">Guardar</string>
     <string name="action_accept">Aceptar</string>
     <string name="action_back">Volver</string>
+    <string name="parking_card_action_detail">Ver detalle</string>
     <string name="loading">Cargando…</string>
 
     <string name="offline_banner_message">Sin conexión. Los datos pueden estar desactualizados.</string>

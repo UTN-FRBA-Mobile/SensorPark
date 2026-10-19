@@ -22,6 +22,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.sensorpark.core.ui.theme.SensorParkTheme
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.font.FontWeight
+
 @Composable
 fun PrimaryButton(
     text: String,
@@ -36,13 +39,13 @@ fun PrimaryButton(
         enabled = enabled && !loading,
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 48.dp),
-        shape = MaterialTheme.shapes.medium,
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+            .defaultMinSize(minHeight = 52.dp),
+        shape = CircleShape,
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
     ) {
         if (loading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(22.dp),
                 color = MaterialTheme.colorScheme.onPrimary,
                 strokeWidth = 2.5.dp,
             )
@@ -56,7 +59,7 @@ fun PrimaryButton(
                 }
                 Text(
                     text = text,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                 )
             }
         }
