@@ -10,6 +10,9 @@ object Collections {
 
     const val RESERVATIONS = "reservations"
     const val WAITLIST = "waitlist"
+
+    /** Subcolección de cada usuario: un documento por teléfono, con su token FCM como id. */
+    const val DEVICES = "devices"
 }
 
 object UserFields {
@@ -20,11 +23,18 @@ object UserFields {
     /** Rol que pide el usuario al registrarse; `assignInitialRole` lo valida y lo borra. */
     const val REQUESTED_ROLE = "requestedRole"
     const val CATEGORY = "category"
+
+    /** Token de las versiones anteriores, uno solo por usuario. Ahora van en [Collections.DEVICES]. */
     const val FCM_TOKEN = "fcmToken"
 
     /** Tipos de aviso que el usuario apagó, por nombre de `NotificationType`. Lo lee T17. */
     const val NOTIFICATIONS_DISABLED = "notificationsDisabled"
     const val CREATED_AT = "createdAt"
+}
+
+object DeviceFields {
+    const val TOKEN = "token"
+    const val UPDATED_AT = "updatedAt"
 }
 
 object ParkingLotFields {

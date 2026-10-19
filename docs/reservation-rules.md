@@ -120,6 +120,10 @@ sensor es el que manda sobre su estado.
 Una reserva `CONFIRMED` sin check-in vence cuando pasa `toleranceUntil`: queda `EXPIRED` y deja el
 lugar. Lo hace una function programada cada minuto.
 
+La misma function avisa por push: 5 minutos antes de que venza, cuando vence, 10 minutos antes del
+fin de la franja de una reserva `IN_USE` y cuando ese fin pasa sin check-out. Los tipos de aviso
+están en la sección "Notificaciones push" de `CLAUDE.md`.
+
 ## Estado del lugar
 
 El estado del lugar refleja lo que pasa ahora; las reservas a futuro no lo cambian:

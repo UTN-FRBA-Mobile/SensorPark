@@ -85,6 +85,37 @@ describe("usuarios", () => {
 
   test("el dueño no se pone una categoría inexistente", () =>
     assertFails(updateDoc(doc(driver("ana"), "users/ana"), { category: "VIP" })));
+
+  test("el dueño guarda los tipos de aviso que apagó", () =>
+    assertSucceeds(updateDoc(doc(driver("ana"), "users/ana"), { notificationsDisabled: ["RESERVATION", "WAITLIST"] })));
+
+  test("los avisos apagados sólo aceptan tipos que existen", () =>
+    assertFails(updateDoc(doc(driver("ana"), "users/ana"), { notificationsDisabled: ["MARKETING"] })));
+
+  test("los avisos apagados son una lista", () =>
+    assertFails(updateDoc(doc(driver("ana"), "users/ana"), { notificationsDisabled: "RESERVATION" })));
+});
+
+describe("dispositivos", () => {
+  test("el dueño registra su teléfono con el token como id", () =>
+    assertSucceeds(setDoc(doc(driver("ana"), "users/ana/devices/tok-1"), { token: "tok-1" })));
+
+  test("el token del documento tiene que ser su id", () =>
+    assertFails(setDoc(doc(driver("ana"), "users/ana/devices/tok-1"), { token: "otro" })));
+
+  test("un dispositivo no guarda otros campos", () =>
+    assertFails(setDoc(doc(driver("ana"), "users/ana/devices/tok-1"), { token: "tok-1", role: "ADMIN" })));
+
+  test("otro usuario no registra un teléfono en una cuenta ajena", () =>
+    assertFails(setDoc(doc(driver("beto"), "users/ana/devices/tok-1"), { token: "tok-1" })));
+
+  test("el dueño lo borra al cerrar sesión, y otro no", async () => {
+    await testEnv.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "users/ana/devices/tok-1"), { token: "tok-1" }));
+    await assertFails(deleteDoc(doc(driver("beto"), "users/ana/devices/tok-1")));
+    await assertFails(getDoc(doc(driver("beto"), "users/ana/devices/tok-1")));
+    await assertSucceeds(deleteDoc(doc(driver("ana"), "users/ana/devices/tok-1")));
+  });
 });
 
 describe("estacionamientos", () => {
