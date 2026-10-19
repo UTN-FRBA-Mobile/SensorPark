@@ -103,6 +103,9 @@ exports.checkIn = reservations.checkIn;
 exports.checkOut = reservations.checkOut;
 exports.joinWaitlist = reservations.joinWaitlist;
 exports.leaveWaitlist = reservations.leaveWaitlist;
+exports.acceptWaitlistOffer = reservations.acceptWaitlistOffer;
+exports.declineWaitlistOffer = reservations.declineWaitlistOffer;
+exports.offerReleasedSpots = reservations.offerReleasedSpots;
 exports.processReservations = reservations.processReservations;
 
 // Confirma al conductor que su reserva quedó registrada. Le llega también a sus otros dispositivos.

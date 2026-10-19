@@ -9,6 +9,7 @@ import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRequest
 import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.WaitlistPosition
+import com.sensorpark.domain.model.WaitlistEntry
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -34,4 +35,13 @@ interface ReservationRepository {
     suspend fun joinWaitlist(request: ReservationRequest): ReservationOutcome<WaitlistPosition>
 
     suspend fun leaveWaitlist(entryId: String): ReservationOutcome<Unit>
+
+    /** Las entradas del usuario en listas de espera, de la más reciente a la más vieja. */
+    fun myWaitlist(): Flow<DataResult<List<WaitlistEntry>>>
+
+    /** Quedarse con el lugar ofrecido: lo convierte en una reserva confirmada. */
+    suspend fun acceptWaitlistOffer(entryId: String): ReservationOutcome<ReservationConfirmation>
+
+    /** No lo quiere: el lugar pasa al siguiente de la fila. */
+    suspend fun declineWaitlistOffer(entryId: String): ReservationOutcome<Unit>
 }

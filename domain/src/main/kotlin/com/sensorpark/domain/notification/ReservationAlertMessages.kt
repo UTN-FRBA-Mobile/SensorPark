@@ -2,6 +2,7 @@ package com.sensorpark.domain.notification
 
 import com.sensorpark.domain.model.ActiveGeofence
 import com.sensorpark.domain.model.AppNotification
+import com.sensorpark.domain.model.WaitlistEntry
 import java.time.Instant
 
 /**
@@ -31,4 +32,18 @@ interface ReservationAlertMessages {
 
     /** La clave del aviso persistente, para poder sacarlo al hacer el check-out. */
     fun stayKey(reservationId: String): String
+
+    /**
+     * Las claves de los avisos que sirven sólo antes de llegar (confirmación, recordatorio y
+     * llegada), para sacarlos todos una vez hecho el check-in: ya no tienen sentido.
+     */
+    fun preArrivalKeys(reservationId: String): List<String>
+
+    /**
+     * Se liberó un lugar para quien estaba en la lista de espera. Usa la misma clave que la push
+     * del backend (`waitlist_offer` + id), así si llegan las dos se ve una sola.
+     */
+    fun waitlistOffer(entry: WaitlistEntry, parkingLotName: String): AppNotification
+
+    fun waitlistOfferKey(entryId: String): String
 }

@@ -88,6 +88,27 @@ object ReservationFields {
     const val AMOUNT = "amount"
 }
 
+/** Campos de `waitlist/{id}`. Las escriben sólo las functions; ver docs/reservation-rules.md. */
+object WaitlistFields {
+    const val USER_ID = "userId"
+    const val PARKING_LOT_ID = "parkingLotId"
+    const val SPOT_TYPE = "spotType"
+    const val ARRIVES_AT = "arrivesAt"
+    const val DURATION_MINUTES = "durationMinutes"
+    const val CATEGORY = "category"
+    const val REQUESTED_AT = "requestedAt"
+    const val STATUS = "status"
+    const val POSITION = "position"
+    const val RESERVATION_ID = "reservationId"
+
+    /** Mapa con `spotId`, `spotCode`, `offeredAt` y `expiresAt`, mientras hay una oferta. */
+    const val OFFER = "offer"
+    const val OFFER_SPOT_ID = "spotId"
+    const val OFFER_SPOT_CODE = "spotCode"
+    const val OFFER_OFFERED_AT = "offeredAt"
+    const val OFFER_EXPIRES_AT = "expiresAt"
+}
+
 /** Cloud Functions invocables de reservas, en functions/reservations.js. */
 object ReservationFunctions {
     const val CREATE = "createReservation"
@@ -97,4 +118,6 @@ object ReservationFunctions {
     const val CHECK_OUT = "checkOut"
     const val JOIN_WAITLIST = "joinWaitlist"
     const val LEAVE_WAITLIST = "leaveWaitlist"
+    const val ACCEPT_WAITLIST_OFFER = "acceptWaitlistOffer"
+    const val DECLINE_WAITLIST_OFFER = "declineWaitlistOffer"
 }

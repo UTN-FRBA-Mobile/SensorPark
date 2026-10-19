@@ -75,8 +75,14 @@ describe("mensajes", () => {
     }
   });
 
-  test("la oferta de la lista de espera dice hasta cuándo se puede aceptar", () =>
-    assert.match(messageFor("waitlist_offer", "w1", { expiresAt: new Date("2026-10-20T17:05:00Z") }).body, /14:05/));
+  test("la oferta de la lista de espera dice dónde, la franja y cuánto tiempo hay para aceptarla", () => {
+    const message = messageFor("waitlist_offer", "w1", {
+      lotName: "Medrano", spotCode: "07",
+      arrivesAt: new Date("2026-10-20T17:00:00Z"), endsAt: new Date("2026-10-20T18:00:00Z"),
+    });
+    assert.equal(message.title, "Se liberó un lugar en Medrano");
+    assert.equal(message.body, "Lugar 07, de 14:00 a 15:00. Tenés 5 minutos para quedártelo.");
+  });
 
   test("sólo se dejan de mandar los tipos que el usuario apagó en la app", () => {
     assert.equal(wantsNotice({}, "RESERVATION"), true);

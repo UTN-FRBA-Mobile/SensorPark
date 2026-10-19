@@ -25,6 +25,11 @@
     <string name="reserve_done_tolerance">Tenés hasta las %1$s para hacer el check-in.</string>
     <string name="reserve_go_to_my_reservations">Ir a mis reservas</string>
 
+    <string name="reserve_join_waitlist">Avisarme si se libera un lugar</string>
+    <string name="reserve_waitlist_joined_title">Estás en la lista de espera</string>
+    <string name="reserve_waitlist_joined_position">Sos el número %1$d de la fila.</string>
+    <string name="reserve_waitlist_joined_body">Si se libera un lugar para tu franja, te lo guardamos 5 minutos y te avisamos para que lo aceptes.</string>
+
     <string name="my_reservations_title">Mis reservas</string>
     <string name="my_reservations_empty">Todavía no tenés reservas. Buscá un estacionamiento y reservá tu lugar.</string>
     <string name="my_reservations_active">Ahora</string>
@@ -43,4 +48,26 @@
     <string name="my_reservations_cancel_confirm">Sí, cancelar</string>
     <string name="my_reservations_cancel_keep">No, dejarla</string>
     <string name="my_reservations_dismiss">Entendido</string>
+
+    <string name="my_reservations_waitlist">Listas de espera</string>
+    <string name="my_reservations_waitlist_slot">%1$s · %2$s a %3$s</string>
+    <string name="my_reservations_waitlist_position">Sos el número %1$d de la fila.</string>
+    <string name="my_reservations_waitlist_leave">Salir de la lista</string>
+    <string name="my_reservations_waitlist_offer">¡Se liberó el lugar %1$s! Te quedan %2$s para aceptarlo.</string>
+    <string name="my_reservations_waitlist_see_offer">Ver la oferta</string>
+
+    <string name="waitlist_offer_title">¡Se liberó un lugar!</string>
+    <string name="waitlist_offer_title_closed">Lista de espera</string>
+    <string name="waitlist_offer_time_left">Te lo guardamos</string>
+    <string name="waitlist_offer_spot">Lugar %1$s · %2$s</string>
+    <string name="waitlist_offer_slot">De %1$s a %2$s, la franja que pediste</string>
+    <string name="waitlist_offer_hint">Si no contestás a tiempo, el lugar pasa al siguiente de la fila.</string>
+    <string name="waitlist_offer_accept">Quiero el lugar</string>
+    <string name="waitlist_offer_working">Reservando…</string>
+    <string name="waitlist_offer_decline">No, gracias</string>
+    <string name="waitlist_offer_declined">Listo, le pasamos el lugar al siguiente de la fila.</string>
+    <string name="waitlist_offer_not_found">Esta oferta ya no está disponible.</string>
+    <string name="waitlist_offer_already_accepted">Ya aceptaste esta oferta: la reserva está en Mis reservas.</string>
+    <string name="waitlist_offer_still_waiting">Todavía no se liberó ningún lugar. Sos el número %1$d de la fila.</string>
+    <string name="waitlist_offer_expired">Se pasaron los 5 minutos y el lugar pasó al siguiente de la fila.</string>
 </resources>

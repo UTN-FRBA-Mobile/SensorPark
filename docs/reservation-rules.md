@@ -153,9 +153,31 @@ límite no, porque anotarse no toma ningún lugar. El orden es:
 3. a igual categoría, por hora de pedido.
 
 No se puede anotar dos veces para la misma franja del mismo estacionamiento
-(`ALREADY_IN_WAITLIST`). La posición que devuelve se cuenta entre quienes esperan la misma franja y
-el mismo tipo de lugar. Al salir, la entrada queda `LEFT`; no se borra. La oferta cuando se libera un lugar, con 5 minutos para aceptar, es parte
-de T18.
+(`ALREADY_IN_WAITLIST`). La posición se cuenta entre quienes esperan la misma franja y el mismo tipo
+de lugar, y se guarda en cada entrada (`position`): la app sólo puede leer las propias, así que no la
+podría calcular. Se recalcula cada vez que cambia la fila.
+
+### La oferta
+
+Cuando se libera un lugar (una reserva se cancela, termina o vence), se recorre la fila del
+estacionamiento en el orden de arriba y a cada uno se le busca un lugar con las mismas reglas que al
+reservar. Al primero cuya franja entra se le **ofrece**: la entrada pasa a `OFFERED` con el lugar y
+la hora en que vence la oferta, 5 minutos después, y le llega un aviso. Así, con dos esperando la
+misma franja, el que tiene categoría de prioridad recibe la oferta aunque se haya anotado después.
+
+Mientras dura, la oferta **guarda el lugar**: cuenta como una reserva activa más, así que ni otra
+oferta ni una reserva directa se lo pueden quedar.
+
+- **Aceptar** (dentro de los 5 minutos) la convierte en una reserva `CONFIRMED` con esa franja,
+  validada igual que al reservar: por ejemplo, con dos reservas activas, `LIMIT_REACHED`. La entrada
+  queda `ACCEPTED` con el id de la reserva. Pasados los 5 minutos, `OFFER_EXPIRED`.
+- **Rechazar** la deja `DECLINED`, y el lugar se le ofrece al siguiente.
+- **No contestar:** el proceso de cada minuto la deja `DECLINED` (con `missed`) y también pasa al
+  siguiente.
+- **Salir** de la lista con una oferta pendiente también la suelta.
+
+Aceptar o rechazar algo que no es una oferta vigente: `NO_OFFER`. Si la franja de una entrada que
+espera ya empezó, queda `EXPIRED`: no tiene sentido ofrecerle nada.
 
 ## Ejemplos
 

@@ -3,6 +3,7 @@
 // transacciones, para que dos pedidos simultáneos no tomen el mismo lugar.
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const rules = require("./reservationRules");
@@ -25,6 +26,8 @@ const MESSAGES = {
   INVALID_STATUS: "La reserva no está en uso.",
   ALREADY_IN_WAITLIST: "Ya estás anotado en la lista de espera para esa franja.",
   SPOT_NOT_TAKEN: "Tu lugar no figura ocupado por otro auto.",
+  NO_OFFER: "Esa oferta ya no está disponible.",
+  OFFER_EXPIRED: `Se pasaron los ${rules.WAITLIST_OFFER_MINUTES} minutos para aceptar el lugar.`,
 };
 
 // Rechazo de negocio: la app lee el motivo en `details.reason`.
@@ -82,6 +85,28 @@ function reservationOf(doc) {
 }
 
 const spotOf = (doc) => ({ id: doc.id, ...doc.data() });
+
+// Una entrada de la lista de espera leída de Firestore, con las fechas como Date.
+function waitlistEntryOf(doc) {
+  const data = doc.data();
+  return {
+    ...data,
+    id: doc.id,
+    arrivesAt: toDate(data.arrivesAt),
+    endsAt: toDate(data.endsAt),
+    requestedAt: toDate(data.requestedAt),
+    offer: data.offer ? { ...data.offer, expiresAt: toDate(data.offer.expiresAt) } : null,
+  };
+}
+
+// Las ofertas vigentes de un estacionamiento, como reservas: guardan su lugar mientras el primero
+// de la fila decide. `exceptEntryId` deja afuera la propia, al aceptarla.
+async function heldOffersOfLot(tx, db, lotId, now, exceptEntryId = null) {
+  const docs = (await tx.get(db.collection("waitlist")
+    .where("parkingLotId", "==", lotId).where("status", "==", "OFFERED"))).docs;
+  return docs.filter((d) => d.id !== exceptEntryId).map(waitlistEntryOf)
+    .filter((e) => !rules.offerExpired(e, now)).map(rules.holdOf);
+}
 
 function activeReservationsOfLot(db, lotId) {
   return db.collection("reservations")
@@ -146,7 +171,11 @@ exports.createReservation = onCall(async (request) => {
     if (!lot.exists) throw new HttpsError("not-found", "No existe ese estacionamiento.");
     const category = await categoryOf(tx, db, uid);
     const spots = (await tx.get(lotRef.collection("spots"))).docs.map(spotOf);
-    const lotReservations = (await tx.get(activeReservationsOfLot(db, lotId))).docs.map(reservationOf);
+    // Los lugares guardados por una oferta de la lista de espera tampoco se pueden reservar.
+    const lotReservations = [
+      ...(await tx.get(activeReservationsOfLot(db, lotId))).docs.map(reservationOf),
+      ...await heldOffersOfLot(tx, db, lotId, now),
+    ];
     const userActive = await tx.get(db.collection("reservations")
       .where("userId", "==", uid).where("status", "in", rules.ACTIVE_STATUSES));
 
@@ -237,8 +266,10 @@ exports.reassignSpot = onCall(async (request) => {
     if (!lot.exists) throw new HttpsError("not-found", "No existe ese estacionamiento.");
 
     const spots = (await tx.get(lotRef.collection("spots"))).docs.map(spotOf);
-    const lotReservations = (await tx.get(activeReservationsOfLot(db, reservation.parkingLotId)))
-      .docs.map(reservationOf);
+    const lotReservations = [
+      ...(await tx.get(activeReservationsOfLot(db, reservation.parkingLotId))).docs.map(reservationOf),
+      ...await heldOffersOfLot(tx, db, reservation.parkingLotId, now),
+    ];
     const category = await categoryOf(tx, db, uid);
 
     const current = spots.find((s) => s.id === reservation.spotId);
@@ -321,6 +352,63 @@ exports.checkOut = onCall(async (request) => {
   });
 });
 
+// Recorre la fila de un estacionamiento y la deja al día: le ofrece lugar al primero cuya franja
+// entra en lo que hay libre, vence las entradas cuya franja ya pasó y recalcula las posiciones.
+// Se llama cada vez que algo pudo cambiar la fila: un lugar que se libera, alguien que se anota,
+// sale, rechaza o deja vencer su oferta. Es idempotente.
+//
+// Los avisos se mandan después de la transacción: si se reintenta, no salen dos veces.
+// `messaging` reemplaza a FCM en los tests.
+async function reconcileWaitlist(db, lotId, now, { messaging } = {}) {
+  const offers = await db.runTransaction(async (tx) => {
+    const lotRef = db.doc(`parkingLots/${lotId}`);
+    const lot = await tx.get(lotRef);
+    if (!lot.exists) return [];
+    const spots = (await tx.get(lotRef.collection("spots"))).docs.map(spotOf);
+    const active = (await tx.get(activeReservationsOfLot(db, lotId))).docs.map(reservationOf);
+    const entries = (await tx.get(db.collection("waitlist")
+      .where("parkingLotId", "==", lotId).where("status", "in", ["WAITING", "OFFERED"]))).docs
+      .map(waitlistEntryOf);
+
+    const holds = entries.filter((e) => e.status === "OFFERED" && !rules.offerExpired(e, now)).map(rules.holdOf);
+    const waiting = entries.filter((e) => e.status === "WAITING");
+    const { offers: planned, stale } = rules.planOffers(waiting, spots, [...active, ...holds], now);
+
+    const expiresAt = new Date(now.getTime() + rules.WAITLIST_OFFER_MINUTES * 60 * 1000);
+    for (const { entry, spot } of planned) {
+      tx.update(db.doc(`waitlist/${entry.id}`), {
+        status: "OFFERED",
+        position: FieldValue.delete(),
+        offer: {
+          spotId: spot.id,
+          spotCode: spot.code,
+          offeredAt: Timestamp.fromDate(now),
+          expiresAt: Timestamp.fromDate(expiresAt),
+        },
+      });
+    }
+    for (const entry of stale) {
+      tx.update(db.doc(`waitlist/${entry.id}`), { status: "EXPIRED", position: FieldValue.delete() });
+    }
+
+    const gone = new Set([...planned.map((o) => o.entry.id), ...stale.map((e) => e.id)]);
+    const stillWaiting = waiting.filter((e) => !gone.has(e.id));
+    for (const [id, position] of rules.waitlistPositions(stillWaiting)) {
+      const entry = stillWaiting.find((e) => e.id === id);
+      if (entry.position !== position) tx.update(db.doc(`waitlist/${id}`), { position });
+    }
+    return planned.map(({ entry, spot }) => ({ entry, spot, lotName: lot.get("name") }));
+  });
+
+  for (const { entry, spot, lotName } of offers) {
+    logger.info("Lugar ofrecido de la lista de espera", { entryId: entry.id, uid: entry.userId, lotId, spotId: spot.id });
+    await notifications.sendNotice(db, entry.userId, "waitlist_offer", entry.id, {
+      lotName, spotCode: spot.code, arrivesAt: entry.arrivesAt, endsAt: entry.endsAt,
+    }, { messaging }).catch((e) => logger.warn("No se pudo mandar el aviso de la oferta", e));
+  }
+  return offers.length;
+}
+
 // Anota al usuario en la lista de espera. Datos: { parkingLotId, arrivesAt, durationMinutes, spotType }.
 exports.joinWaitlist = onCall(async (request) => {
   const uid = requireBookingRole(request);
@@ -332,7 +420,7 @@ exports.joinWaitlist = onCall(async (request) => {
 
   const db = getFirestore();
   const now = new Date();
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const lot = await tx.get(db.doc(`parkingLots/${lotId}`));
     if (!lot.exists) throw new HttpsError("not-found", "No existe ese estacionamiento.");
     const category = await categoryOf(tx, db, uid);
@@ -343,46 +431,177 @@ exports.joinWaitlist = onCall(async (request) => {
     }, now);
     if (problem) throw rejection(problem);
 
-    const waiting = (await tx.get(db.collection("waitlist")
-      .where("parkingLotId", "==", lotId).where("status", "==", "WAITING"))).docs
-      .map((d) => ({ ...d.data(), arrivesAt: toDate(d.get("arrivesAt")), requestedAt: toDate(d.get("requestedAt")) }));
+    const queued = (await tx.get(db.collection("waitlist")
+      .where("parkingLotId", "==", lotId).where("status", "in", ["WAITING", "OFFERED"]))).docs.map(waitlistEntryOf);
     const sameSlot = (e) => e.arrivesAt.getTime() === arrivesAt.getTime() && e.durationMinutes === durationMinutes;
-    if (waiting.some((e) => e.userId === uid && sameSlot(e))) throw rejection("ALREADY_IN_WAITLIST");
+    // Con una oferta pendiente para esa franja tampoco: ya está en la lista.
+    if (queued.some((e) => e.userId === uid && sameSlot(e))) throw rejection("ALREADY_IN_WAITLIST");
+    const waiting = queued.filter((e) => e.status === "WAITING");
 
+    const ref = db.collection("waitlist").doc();
     const requestedAt = new Date();
     const entry = {
+      id: ref.id,
+      userId: uid,
+      parkingLotId: lotId,
+      spotType: data.spotType,
+      arrivesAt,
+      durationMinutes,
+      endsAt: rules.endsAt(arrivesAt, durationMinutes),
+      category,
+      requestedAt,
+      status: "WAITING",
+    };
+    // La posición se guarda en cada entrada para que la app la muestre al día: sólo puede leer las
+    // suyas, así que no la puede calcular. Con categoría de prioridad se puede quedar adelante de
+    // otros, así que se recalculan todas.
+    const positions = rules.waitlistPositions([...waiting, entry]);
+    tx.set(ref, {
       userId: uid,
       parkingLotId: lotId,
       spotType: data.spotType,
       arrivesAt: Timestamp.fromDate(arrivesAt),
       durationMinutes,
-      endsAt: Timestamp.fromDate(rules.endsAt(arrivesAt, durationMinutes)),
+      endsAt: Timestamp.fromDate(entry.endsAt),
       category,
       requestedAt: Timestamp.fromDate(requestedAt),
       status: "WAITING",
-    };
-    const ref = db.collection("waitlist").doc();
-    tx.set(ref, entry);
-    // La posición es entre quienes esperan la misma franja y el mismo tipo de lugar.
-    const queue = [...waiting.filter((e) => sameSlot(e) && e.spotType === data.spotType),
-      { category, requestedAt, userId: uid }]
-      .sort(rules.waitlistCompare);
-    return { entryId: ref.id, position: queue.findIndex((e) => e.userId === uid) + 1 };
+      position: positions.get(ref.id),
+    });
+    for (const other of waiting) {
+      if (other.position !== positions.get(other.id)) {
+        tx.update(db.doc(`waitlist/${other.id}`), { position: positions.get(other.id) });
+      }
+    }
+    return { entryId: ref.id, position: positions.get(ref.id) };
   });
+
+  // Si entre el "no hay lugar" y anotarse se liberó uno, la oferta sale ya.
+  await reconcileWaitlist(db, lotId, now);
+  return result;
 });
 
-// Saca al usuario de la lista de espera. Datos: { entryId }.
+// Lee una entrada propia de la lista de espera.
+async function ownWaitlistEntry(tx, db, uid, entryId) {
+  const ref = db.doc(`waitlist/${requireString(entryId, "entryId")}`);
+  const doc = await tx.get(ref);
+  if (!doc.exists) throw new HttpsError("not-found", "No existe esa entrada.");
+  if (doc.get("userId") !== uid) throw new HttpsError("permission-denied", "La entrada no es tuya.");
+  return { ref, entry: waitlistEntryOf(doc) };
+}
+
+// Saca al usuario de la lista de espera. Datos: { entryId }. Si tenía una oferta, la suelta.
 exports.leaveWaitlist = onCall(async (request) => {
   const uid = requireSignedIn(request);
   const db = getFirestore();
-  const ref = db.doc(`waitlist/${requireString((request.data || {}).entryId, "entryId")}`);
-  return db.runTransaction(async (tx) => {
-    const entry = await tx.get(ref);
-    if (!entry.exists) throw new HttpsError("not-found", "No existe esa entrada.");
-    if (entry.get("userId") !== uid) throw new HttpsError("permission-denied", "La entrada no es tuya.");
-    tx.update(ref, { status: "LEFT" });
-    return { status: "LEFT" };
+  const now = new Date();
+  const { lotId } = await db.runTransaction(async (tx) => {
+    const { ref, entry } = await ownWaitlistEntry(tx, db, uid, (request.data || {}).entryId);
+    if (["WAITING", "OFFERED"].includes(entry.status)) {
+      tx.update(ref, { status: "LEFT", position: FieldValue.delete() });
+    }
+    return { lotId: entry.parkingLotId };
   });
+  // Los que estaban detrás suben un lugar, y si soltó una oferta le toca al siguiente.
+  await reconcileWaitlist(db, lotId, now);
+  return { status: "LEFT" };
+});
+
+// Acepta la oferta de la lista de espera: la convierte en una reserva confirmada con esa franja,
+// igual que si hubiera reservado. Datos: { entryId }.
+exports.acceptWaitlistOffer = onCall(async (request) => {
+  const uid = requireBookingRole(request);
+  const db = getFirestore();
+  const now = new Date();
+  return db.runTransaction(async (tx) => {
+    const { ref, entry } = await ownWaitlistEntry(tx, db, uid, (request.data || {}).entryId);
+    const offerProblem = rules.offerProblem(entry, now);
+    if (offerProblem) throw rejection(offerProblem);
+
+    const lotRef = db.doc(`parkingLots/${entry.parkingLotId}`);
+    const lot = await tx.get(lotRef);
+    if (!lot.exists) throw new HttpsError("not-found", "No existe ese estacionamiento.");
+    const spots = (await tx.get(lotRef.collection("spots"))).docs.map(spotOf);
+    const lotReservations = [
+      ...(await tx.get(activeReservationsOfLot(db, entry.parkingLotId))).docs.map(reservationOf),
+      ...await heldOffersOfLot(tx, db, entry.parkingLotId, now, entry.id),
+    ];
+    const userActive = await tx.get(db.collection("reservations")
+      .where("userId", "==", uid).where("status", "in", rules.ACTIVE_STATUSES));
+
+    // Las mismas validaciones que al reservar: entre que se anotó y ahora pudo cambiar algo, por
+    // ejemplo que ya tenga dos reservas activas.
+    const problem = rules.requestProblem({
+      arrivesAt: entry.arrivesAt, durationMinutes: entry.durationMinutes, spotType: entry.spotType,
+      category: entry.category, activeReservations: userActive.size, schedule: lot.get("schedule"),
+    }, now);
+    if (problem) throw rejection(problem);
+
+    const spot = rules.pickSpot(spots, {
+      spotType: entry.spotType, spotId: entry.offer.spotId, category: entry.category,
+      arrivesAt: entry.arrivesAt, endsAt: entry.endsAt, reservations: lotReservations,
+    }, now);
+    if (!spot) throw rejection("NO_SPOTS");
+
+    const toleranceUntil = rules.toleranceUntil(entry.arrivesAt, lot.get("toleranceMinutes"));
+    const reservationRef = db.collection("reservations").doc();
+    tx.set(reservationRef, {
+      userId: uid,
+      parkingLotId: entry.parkingLotId,
+      spotId: spot.id,
+      spotCode: spot.code,
+      spotType: spot.type,
+      arrivesAt: Timestamp.fromDate(entry.arrivesAt),
+      durationMinutes: entry.durationMinutes,
+      endsAt: Timestamp.fromDate(entry.endsAt),
+      toleranceUntil: Timestamp.fromDate(toleranceUntil),
+      status: "CONFIRMED",
+      fromWaitlist: entry.id,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    const spotUpdate = { lastReservationAt: FieldValue.serverTimestamp() };
+    if (rules.isInNowWindow(entry.arrivesAt, now)) {
+      spotUpdate.status = "RESERVED";
+      spotUpdate.updatedAt = FieldValue.serverTimestamp();
+    }
+    tx.update(lotRef.collection("spots").doc(spot.id), spotUpdate);
+    tx.update(ref, { status: "ACCEPTED", reservationId: reservationRef.id });
+
+    logger.info("Oferta de la lista de espera aceptada", { entryId: entry.id, uid, reservationId: reservationRef.id });
+    return {
+      reservationId: reservationRef.id,
+      spotId: spot.id,
+      spotCode: spot.code,
+      arrivesAt: entry.arrivesAt.toISOString(),
+      endsAt: entry.endsAt.toISOString(),
+      toleranceUntil: toleranceUntil.toISOString(),
+    };
+  });
+});
+
+// Rechaza la oferta: el lugar pasa al siguiente de la fila. Datos: { entryId }.
+exports.declineWaitlistOffer = onCall(async (request) => {
+  const uid = requireSignedIn(request);
+  const db = getFirestore();
+  const now = new Date();
+  const { lotId } = await db.runTransaction(async (tx) => {
+    const { ref, entry } = await ownWaitlistEntry(tx, db, uid, (request.data || {}).entryId);
+    if (entry.status !== "OFFERED") throw rejection("NO_OFFER");
+    tx.update(ref, { status: "DECLINED" });
+    return { lotId: entry.parkingLotId };
+  });
+  await reconcileWaitlist(db, lotId, now);
+  return { status: "DECLINED" };
+});
+
+// Cuando una reserva activa deja de serlo (se cancela, termina o vence), su lugar puede servirle a
+// alguien de la lista de espera. Un trigger y no una llamada desde cada function: así ningún camino
+// que libera un lugar se olvida de avisar.
+exports.offerReleasedSpots = onDocumentUpdated("reservations/{reservationId}", async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  if (!rules.ACTIVE_STATUSES.includes(before.status) || rules.ACTIVE_STATUSES.includes(after.status)) return;
+  await reconcileWaitlist(getFirestore(), after.parkingLotId, new Date());
 });
 
 // Lo que hace el proceso de cada minuto, con la hora como parámetro para poder probarlo:
@@ -427,8 +646,26 @@ async function processReservationsAt(db, now, { messaging } = {}) {
     });
   }
 
+  // Ofertas de la lista de espera que nadie contestó a tiempo: el lugar pasa al siguiente de la fila.
+  const missed = await db.collection("waitlist")
+    .where("status", "==", "OFFERED")
+    .where("offer.expiresAt", "<", Timestamp.fromDate(now)).get();
+  const lotsToReconcile = new Set();
+  let offersMissed = 0;
+  for (const doc of missed.docs) {
+    await db.runTransaction(async (tx) => {
+      const entry = waitlistEntryOf(await tx.get(doc.ref));
+      if (!rules.offerExpired(entry, now)) return;
+      tx.update(doc.ref, { status: "DECLINED", missed: true });
+      lotsToReconcile.add(entry.parkingLotId);
+      offersMissed++;
+    });
+  }
+  for (const lotId of lotsToReconcile) await reconcileWaitlist(db, lotId, now, { messaging });
+
+
   const notified = await sendDueNotices(db, now, messaging);
-  return { expired, reserved, notified };
+  return { expired, reserved, offersMissed, notified };
 }
 
 // Avisos que dependen de la hora: reserva por vencer, franja por terminar y estadía prolongada.
@@ -477,3 +714,4 @@ exports.processReservations = onSchedule("every 1 minutes", async () => {
 });
 
 exports.processReservationsAt = processReservationsAt;
+exports.reconcileWaitlist = reconcileWaitlist;

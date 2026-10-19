@@ -4,7 +4,7 @@
 const logger = require("firebase-functions/logger");
 const { FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
-const { TIME_ZONE } = require("./reservationRules");
+const { TIME_ZONE, WAITLIST_OFFER_MINUTES } = require("./reservationRules");
 
 const MINUTE = 60 * 1000;
 // Cuánto antes de que termine la tolerancia se avisa que la reserva está por vencer.
@@ -65,12 +65,13 @@ const NOTICES = {
     body: (r) => `Tu estadía en el lugar ${r.spotCode} terminaba a las ${localTime(r.endsAt)}. ` +
       "Hacé check-out cuando te vayas para liberarlo.",
   },
-  // Lo dispara la lista de espera (T18) cuando se libera un lugar; `id` es la entrada de la lista.
-  // Recibe { spotCode, expiresAt }: hasta cuándo puede aceptar la oferta.
+  // Lo dispara la lista de espera (reconcileWaitlist) cuando se libera un lugar; `id` es la entrada
+  // de la lista y el toque abre la oferta. Recibe { lotName, spotCode, arrivesAt, endsAt }.
   waitlist_offer: {
     appType: NOTIFICATION_TYPES.WAITLIST,
-    title: () => "Se liberó un lugar",
-    body: (o) => `Hay un lugar para tu franja. Tenés hasta las ${localTime(o.expiresAt)} para aceptarlo.`,
+    title: (o) => `Se liberó un lugar en ${o.lotName}`,
+    body: (o) => `Lugar ${o.spotCode}, de ${localTime(o.arrivesAt)} a ${localTime(o.endsAt)}. ` +
+      `Tenés ${WAITLIST_OFFER_MINUTES} minutos para quedártelo.`,
   },
 };
 

@@ -11,10 +11,12 @@ import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationRequest
 import com.sensorpark.domain.model.SpotType
+import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.repository.ParkingLotRepository
 import com.sensorpark.domain.repository.UserRepository
 import com.sensorpark.domain.reservation.ReservationRules
 import com.sensorpark.domain.usecase.CreateReservationUseCase
+import com.sensorpark.domain.usecase.JoinWaitlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,7 +53,12 @@ data class ReserveState(
     val failure: DataErrorReason? = null,
     /** Cuando está, la reserva se hizo y la pantalla muestra el resumen. */
     val confirmation: ReservationConfirmation? = null,
+    /** Cuando está, se anotó en la lista de espera de esta franja (T18). */
+    val waitlist: WaitlistPosition? = null,
 ) {
+    /** Sin lugar para la franja, se puede anotar en la lista de espera en vez de rendirse. */
+    val canJoinWaitlist: Boolean get() = rejection == ReservationRejection.NO_SPOTS && waitlist == null
+
     val durations: List<Int> get() = ReservationRules.ALLOWED_DURATIONS_MINUTES
 
     /** Los preferenciales sólo se ofrecen a quien declaró una prioridad. */
@@ -101,6 +108,7 @@ class ReserveViewModel @Inject constructor(
     private val parkingLots: ParkingLotRepository,
     private val users: UserRepository,
     private val createReservation: CreateReservationUseCase,
+    private val enterWaitlist: JoinWaitlistUseCase,
     private val clock: Clock,
 ) : ViewModel() {
 
@@ -123,6 +131,7 @@ class ReserveViewModel @Inject constructor(
             rejection = action.rejection,
             failure = (lot as? DataResult.Failure)?.reason ?: action.failure,
             confirmation = action.confirmation,
+            waitlist = action.waitlist,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReserveState(form = defaultForm()))
 
@@ -148,13 +157,7 @@ class ReserveViewModel @Inject constructor(
 
         viewModelScope.launch {
             action.update { it.copy(working = true, rejection = null, failure = null) }
-            val request = ReservationRequest(
-                parkingLotId = lot.id,
-                arrivesAt = current.arrivesAt,
-                durationMinutes = current.form.durationMinutes,
-                spotType = current.form.spotType,
-            )
-            when (val outcome = createReservation(request, lot, current.category)) {
+            when (val outcome = createReservation(request(current, lot), lot, current.category)) {
                 is ReservationOutcome.Success ->
                     action.update { it.copy(working = false, confirmation = outcome.value) }
                 is ReservationOutcome.Rejected ->
@@ -164,6 +167,35 @@ class ReserveViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Sin lugar para la franja: anotarse en la lista de espera con el mismo pedido. Si se libera un
+     * lugar, el backend se lo ofrece por unos minutos y avisa (T18).
+     */
+    fun joinWaitlist() {
+        val current = state.value
+        val lot = current.parkingLot ?: return
+        if (current.working || current.waitlist != null) return
+
+        viewModelScope.launch {
+            action.update { it.copy(working = true, failure = null) }
+            when (val outcome = enterWaitlist(request(current, lot), lot, current.category)) {
+                is ReservationOutcome.Success ->
+                    action.update { it.copy(working = false, rejection = null, waitlist = outcome.value) }
+                is ReservationOutcome.Rejected ->
+                    action.update { it.copy(working = false, rejection = outcome.reason) }
+                is ReservationOutcome.Failed ->
+                    action.update { it.copy(working = false, failure = outcome.reason) }
+            }
+        }
+    }
+
+    private fun request(current: ReserveState, lot: ParkingLot) = ReservationRequest(
+        parkingLotId = lot.id,
+        arrivesAt = current.arrivesAt,
+        durationMinutes = current.form.durationMinutes,
+        spotType = current.form.spotType,
+    )
 
     /** Por defecto, llegar en media hora: la hora más común y siempre dentro de lo permitido. */
     private fun defaultForm(): ReserveForm {
@@ -176,5 +208,6 @@ class ReserveViewModel @Inject constructor(
         val rejection: ReservationRejection? = null,
         val failure: DataErrorReason? = null,
         val confirmation: ReservationConfirmation? = null,
+        val waitlist: WaitlistPosition? = null,
     )
 }
