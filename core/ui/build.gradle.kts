@@ -30,6 +30,7 @@ dependencies {
     api(libs.ui.graphics)
     api(libs.ui.tooling.preview)
     api(libs.material3)
+    api(libs.material.icons.extended)
 
     debugImplementation(libs.ui.tooling)
 }
