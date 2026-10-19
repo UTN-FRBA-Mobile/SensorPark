@@ -1,7 +1,6 @@
 package com.sensorpark.app.navigation
 
 import android.content.Intent
-import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -17,16 +16,13 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.util.Consumer
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -59,9 +55,16 @@ import com.sensorpark.feature.parking.ParkingLotDetailScreen
 import com.sensorpark.feature.reservations.MyReservationsScreen
 import com.sensorpark.feature.reservations.ReserveScreen
 
-/** Raíz de la UI: según la sesión muestra el ingreso o la app. */
+/**
+ * Raíz de la UI: según la sesión muestra el ingreso o la app. [pendingDeepLink] es un deep link que
+ * llegó con la app ya creada (por ejemplo, al tocar un aviso); se abre cuando hay sesión.
+ */
 @Composable
-fun AppNavigation(vm: SessionViewModel = hiltViewModel()) {
+fun AppNavigation(
+    pendingDeepLink: Intent? = null,
+    onDeepLinkHandled: () -> Unit = {},
+    vm: SessionViewModel = hiltViewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
 
     when (val current = state) {
@@ -75,7 +78,7 @@ fun AppNavigation(vm: SessionViewModel = hiltViewModel()) {
                 // Recién con el rol asignado: si el token se guardara antes, podría crear el documento
                 // del usuario antes que el registro, y el rol pedido se perdería.
                 RegisterDevice(vm::registerDevice)
-                MainNavigation(current, role, onSignOut = vm::signOut)
+                MainNavigation(current, role, pendingDeepLink, onDeepLinkHandled, onSignOut = vm::signOut)
             }
         }
     }
@@ -99,9 +102,21 @@ private fun AuthNavigation() {
  * conocen entre sí ni conocen las rutas: cada pantalla recibe lambdas y acá se decide a dónde lleva.
  */
 @Composable
-private fun MainNavigation(state: SessionState.SignedIn, role: Role, onSignOut: () -> Unit) {
+private fun MainNavigation(
+    state: SessionState.SignedIn,
+    role: Role,
+    pendingDeepLink: Intent?,
+    onDeepLinkHandled: () -> Unit,
+    onSignOut: () -> Unit,
+) {
     val nav = rememberNavController()
-    HandleNewDeepLinks(nav)
+    // Después de la composición, cuando el NavHost ya tiene su grafo.
+    LaunchedEffect(pendingDeepLink) {
+        if (pendingDeepLink != null) {
+            nav.handleDeepLink(pendingDeepLink)
+            onDeepLinkHandled()
+        }
+    }
     val tabs = Tab.forRole(role)
     val backStackEntry by nav.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
@@ -228,17 +243,6 @@ private fun NavGraphBuilder.accountTab(nav: NavHostController, state: SessionSta
         composable(Route.Diagnostics.pattern) {
             DiagnosticsScreen()
         }
-    }
-}
-
-/** Con la app ya abierta, un deep link llega por onNewIntent y hay que pasárselo al NavController. */
-@Composable
-private fun HandleNewDeepLinks(nav: NavHostController) {
-    val activity = LocalContext.current as? ComponentActivity ?: return
-    DisposableEffect(activity, nav) {
-        val listener = Consumer<Intent> { nav.handleDeepLink(it) }
-        activity.addOnNewIntentListener(listener)
-        onDispose { activity.removeOnNewIntentListener(listener) }
     }
 }
 

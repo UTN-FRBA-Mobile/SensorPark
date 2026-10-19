@@ -7,7 +7,6 @@ const logger = require("firebase-functions/logger");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
-const { getMessaging } = require("firebase-admin/messaging");
 const { seed } = require("./seed");
 const { affectsCounters, recountParkingLot } = require("./counters");
 const simulator = require("./simulator");
@@ -19,6 +18,7 @@ initializeApp();
 const db = getFirestore();
 // Después de setGlobalOptions: si se carga antes, sus functions quedan en la región por defecto.
 const reservations = require("./reservations");
+const { sendPush, sendNotice } = require("./notifications");
 
 // DRIVER: conductor, el usuario final. PARKING_ADMIN: crea y administra estacionamientos (los que
 // lo tienen en `adminUids`). ADMIN: superusuario del sistema, sólo para desarrollo y pruebas.
@@ -105,44 +105,40 @@ exports.joinWaitlist = reservations.joinWaitlist;
 exports.leaveWaitlist = reservations.leaveWaitlist;
 exports.processReservations = reservations.processReservations;
 
-// Envía una push sólo `data` (todos strings) a los usuarios indicados y limpia tokens vencidos.
-async function sendPush(uids, data) {
-  const docs = await Promise.all(uids.map((uid) => db.doc(`users/${uid}`).get()));
-  const recipients = docs.filter((d) => d.exists && d.get("fcmToken"));
-  if (recipients.length === 0) return 0;
-
-  const response = await getMessaging().sendEachForMulticast({
-    tokens: recipients.map((d) => d.get("fcmToken")),
-    data,
-    // priority high para que Doze no la retenga; ttl explícito para que no llegue horas tarde.
-    android: { priority: "high", ttl: 10 * 60 * 1000 },
-  });
-
-  const expired = ["messaging/registration-token-not-registered", "messaging/invalid-registration-token"];
-  await Promise.all(response.responses.map((r, i) =>
-    !r.success && expired.includes(r.error.code)
-      ? recipients[i].ref.update({ fcmToken: FieldValue.delete() })
-      : null));
-  return response.successCount;
-}
-
-// Ejemplo del circuito de avisos: confirma al conductor que su reserva quedó registrada.
+// Confirma al conductor que su reserva quedó registrada. Le llega también a sus otros dispositivos.
 exports.notifyReservationCreated = onDocumentCreated("reservations/{reservationId}", async (event) => {
   const reservation = event.data.data();
   if (!reservation.userId) return;
-  await sendPush([reservation.userId], {
-    type: "reservation_created",
-    id: event.params.reservationId,
-    title: "Reserva confirmada",
-    body: "Tu lugar quedó reservado.",
+  await sendNotice(db, reservation.userId, "reservationConfirmed", event.params.reservationId, {
+    spotCode: reservation.spotCode,
+    arrivesAt: reservation.arrivesAt.toDate(),
   });
+});
+
+// Un teléfono es de quien tiene la sesión abierta. Si su token se registra en otra cuenta (otra
+// persona inició sesión en el mismo teléfono sin que la anterior cerrara bien la suya), se le saca a
+// la cuenta anterior, así sus avisos no le llegan al que tiene el teléfono ahora.
+exports.claimDevice = onDocumentWritten("users/{uid}/devices/{deviceId}", async (event) => {
+  const device = event.data.after.data();
+  if (!device || !device.token) return;
+  const sameToken = await db.collectionGroup("devices").where("token", "==", device.token).get();
+  // Gana el registro más nuevo: si los dos triggers corren casi juntos, no se borran entre sí.
+  const mine = event.data.after.updateTime;
+  const others = sameToken.docs.filter((d) =>
+    d.ref.path !== event.data.after.ref.path && d.updateTime.toMillis() < mine.toMillis());
+  await Promise.all(others.map((d) => d.ref.delete()));
+  const legacy = await db.collection("users").where("fcmToken", "==", device.token).get();
+  await Promise.all(legacy.docs.filter((d) => d.id !== event.params.uid)
+    .map((d) => d.ref.update({ fcmToken: FieldValue.delete() })));
+  if (others.length > 0) logger.info("Dispositivo pasado a otra cuenta", { uid: event.params.uid, removed: others.length });
 });
 
 // La usa la pantalla de diagnóstico de la app: manda una push al propio usuario para
 // verificar de punta a punta Functions + FCM.
 exports.sendTestPush = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión.");
-  const sent = await sendPush([request.auth.uid], {
+  // Sin preferencias: el usuario la pide a propósito.
+  const sent = await sendPush(db, [request.auth.uid], {
     type: "test",
     id: String(Date.now()),
     title: "Push de prueba",
