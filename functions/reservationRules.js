@@ -158,6 +158,76 @@ function waitlistCompare(a, b) {
   return rank(a) - rank(b) || a.requestedAt - b.requestedAt;
 }
 
+// Estados de una entrada de la lista de espera. WAITING espera; OFFERED tiene un lugar guardado por
+// WAITLIST_OFFER_MINUTES; ACCEPTED lo aceptó y tiene reserva; DECLINED lo rechazó o lo dejó vencer;
+// LEFT salió de la lista; EXPIRED su franja pasó sin que se liberara nada.
+const WAITLIST_STATUSES = ["WAITING", "OFFERED", "ACCEPTED", "DECLINED", "LEFT", "EXPIRED"];
+
+// Su franja ya empezó (con el mismo margen que al reservar): no tiene sentido ofrecerle nada.
+function waitlistSlotPassed(entry, now) {
+  return entry.arrivesAt < plusMinutes(now, -PAST_GRACE_MINUTES);
+}
+
+function offerExpired(entry, now) {
+  return entry.status === "OFFERED" && Boolean(entry.offer) && now > entry.offer.expiresAt;
+}
+
+// Una oferta guarda su lugar: para elegir lugares cuenta como una reserva activa más. Así ni otra
+// oferta ni una reserva directa se lo pueden quedar mientras el primero de la fila decide.
+function holdOf(entry) {
+  return {
+    id: `offer-${entry.id}`, spotId: entry.offer.spotId, status: "CONFIRMED",
+    arrivesAt: entry.arrivesAt, endsAt: entry.endsAt,
+  };
+}
+
+// A quién ofrecerle lugar. Recorre la fila en orden y a cada uno le busca un lugar con las mismas
+// reglas que al reservar, contando como ocupados los que ya guardaron las ofertas anteriores: así se
+// le ofrece al primero cuya franja entra en lo que se liberó. `reservations` son las activas del
+// estacionamiento más las ofertas vigentes. Devuelve las ofertas a hacer y las entradas vencidas.
+function planOffers(waiting, spots, reservations, now) {
+  const offers = [];
+  const stale = [];
+  const taken = [...reservations];
+  for (const entry of [...waiting].sort(waitlistCompare)) {
+    if (waitlistSlotPassed(entry, now)) {
+      stale.push(entry);
+      continue;
+    }
+    const spot = pickSpot(spots, {
+      spotType: entry.spotType, spotId: null, category: entry.category,
+      arrivesAt: entry.arrivesAt, endsAt: entry.endsAt, reservations: taken,
+    }, now);
+    if (!spot) continue;
+    offers.push({ entry, spot });
+    taken.push(holdOf({ ...entry, offer: { spotId: spot.id } }));
+  }
+  return { offers, stale };
+}
+
+// La posición de cada entrada que espera, entre quienes piden la misma franja y el mismo tipo de
+// lugar (1 es el primero). Devuelve un Map de id de entrada a posición.
+function waitlistPositions(waiting) {
+  const groups = new Map();
+  for (const entry of waiting) {
+    const key = `${entry.arrivesAt.getTime()}|${entry.durationMinutes}|${entry.spotType}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  }
+  const positions = new Map();
+  for (const group of groups.values()) {
+    group.sort(waitlistCompare).forEach((entry, i) => positions.set(entry.id, i + 1));
+  }
+  return positions;
+}
+
+// Motivo por el que no se puede aceptar o rechazar una oferta, o null.
+function offerProblem(entry, now) {
+  if (entry.status !== "OFFERED" || !entry.offer) return "NO_OFFER";
+  if (now > entry.offer.expiresAt) return "OFFER_EXPIRED";
+  return null;
+}
+
 module.exports = {
   ALLOWED_DURATIONS_MINUTES, MAX_ADVANCE_DAYS, PAST_GRACE_MINUTES, MAX_ACTIVE_RESERVATIONS,
   NOW_WINDOW_MINUTES, EARLY_CHECK_IN_MINUTES, WAITLIST_OFFER_MINUTES, TIME_ZONE,
@@ -165,4 +235,5 @@ module.exports = {
   endsAt, toleranceUntil, localMinutes, withinSchedule, requestProblem, overlaps, takenUntil,
   isInNowWindow, spotFits, pickSpot, canCancel, reassignProblem, distanceMeters, checkInProblem,
   checkoutSummary, isExpired, spotStatusAfterRelease, waitlistCompare,
+  WAITLIST_STATUSES, waitlistSlotPassed, offerExpired, holdOf, planOffers, waitlistPositions, offerProblem,
 };

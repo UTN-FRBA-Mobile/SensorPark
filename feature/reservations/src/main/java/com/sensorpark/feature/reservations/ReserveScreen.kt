@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -45,6 +46,7 @@ import com.sensorpark.core.ui.components.formatTime
 import com.sensorpark.core.ui.components.label
 import com.sensorpark.core.ui.components.message
 import com.sensorpark.domain.model.ReservationConfirmation
+import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.reservation.ReservationRules
 import java.time.Instant
 import java.time.LocalDate
@@ -70,12 +72,12 @@ fun ReserveScreen(
         state.loading -> LoadingContent()
         state.parkingLot == null && failure != null -> ErrorContent(failure, onRetry = { vm.load(parkingLotId) })
         confirmation != null -> Confirmation(state, confirmation, onOpenMyReservations)
-        else -> Form(state, vm)
+        else -> Form(state, vm, onOpenMyReservations)
     }
 }
 
 @Composable
-private fun Form(state: ReserveState, vm: ReserveViewModel) {
+private fun Form(state: ReserveState, vm: ReserveViewModel, onOpenMyReservations: () -> Unit) {
     var pickingDate by remember { mutableStateOf(false) }
     var pickingTime by remember { mutableStateOf(false) }
 
@@ -136,7 +138,21 @@ private fun Form(state: ReserveState, vm: ReserveViewModel) {
             Text(stringResource(if (state.working) R.string.reserve_working else R.string.reserve_confirm))
         }
 
-        state.rejection?.let { Problem(it.message(), state.alternatives, vm::dismissError) }
+        state.rejection?.let {
+            Problem(
+                message = it.message(),
+                alternatives = state.alternatives,
+                onDismiss = vm::dismissError,
+                waitlistAction = if (!state.canJoinWaitlist) null else {
+                    {
+                        Button(onClick = vm::joinWaitlist, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.reserve_join_waitlist))
+                        }
+                    }
+                },
+            )
+        }
+        state.waitlist?.let { Joined(it, onOpenMyReservations) }
         if (state.parkingLot != null) failureMessage(state)?.let { Problem(it, emptyList(), vm::dismissError) }
     }
 
@@ -165,9 +181,32 @@ private fun Form(state: ReserveState, vm: ReserveViewModel) {
 @Composable
 private fun failureMessage(state: ReserveState): String? = state.failure?.message()
 
+/** Anotado en la lista de espera: en qué lugar de la fila quedó y qué va a pasar. */
+@Composable
+private fun Joined(waitlist: WaitlistPosition, onOpenMyReservations: () -> Unit) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.reserve_waitlist_joined_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.reserve_waitlist_joined_position, waitlist.position))
+            Text(
+                stringResource(R.string.reserve_waitlist_joined_body),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(onClick = onOpenMyReservations, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.reserve_go_to_my_reservations))
+            }
+        }
+    }
+}
+
 /** Un error con, si hay, qué probar en vez de quedarse sin nada. */
 @Composable
-private fun Problem(message: String, alternatives: List<ReserveAlternative>, onDismiss: () -> Unit) {
+private fun Problem(
+    message: String,
+    alternatives: List<ReserveAlternative>,
+    onDismiss: () -> Unit,
+    waitlistAction: (@Composable () -> Unit)? = null,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(message)
@@ -188,6 +227,7 @@ private fun Problem(message: String, alternatives: List<ReserveAlternative>, onD
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+            waitlistAction?.invoke()
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.reserve_dismiss)) }
         }
     }

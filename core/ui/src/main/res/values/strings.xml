@@ -39,4 +39,6 @@
     <string name="rejection_invalid_status">Esa acción no corresponde al estado de la reserva.</string>
     <string name="rejection_already_in_waitlist">Ya estás anotado en la lista de espera.</string>
     <string name="rejection_spot_not_taken">Tu lugar no figura ocupado por otro auto.</string>
+    <string name="rejection_no_offer">No tenés una oferta pendiente para esta lista de espera.</string>
+    <string name="rejection_offer_expired">Se pasaron los 5 minutos: el lugar pasó al siguiente de la fila.</string>
 </resources>

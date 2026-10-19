@@ -17,6 +17,7 @@ import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationRequest
 import com.sensorpark.domain.model.SpotReassignment
+import com.sensorpark.domain.model.WaitlistEntry
 import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.repository.ReservationRepository
 import kotlinx.coroutines.TimeoutCancellationException
@@ -118,6 +119,37 @@ class ReservationRepositoryFirebase @Inject constructor(
 
     override suspend fun leaveWaitlist(entryId: String): ReservationOutcome<Unit> =
         call(ReservationFunctions.LEAVE_WAITLIST, mapOf("entryId" to entryId)) { }
+
+    override fun myWaitlist(): Flow<DataResult<List<WaitlistEntry>>> = callbackFlow {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            trySend(DataResult.Failure(DataErrorReason.PERMISSION_DENIED))
+            close()
+            return@callbackFlow
+        }
+        // Como con las reservas: las reglas sólo dejan leer las propias.
+        val registration = db.collection(Collections.WAITLIST)
+            .whereEqualTo(WaitlistFields.USER_ID, uid)
+            .orderBy(WaitlistFields.REQUESTED_AT, Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                when {
+                    error != null -> {
+                        trySend(DataResult.Failure(error.toReason()))
+                        close()
+                    }
+                    snapshot != null -> trySend(
+                        DataResult.Success(snapshot.documents.mapNotNull { waitlistEntryFrom(it.id, it.data.orEmpty()) }),
+                    )
+                }
+            }
+        awaitClose { registration.remove() }
+    }
+
+    override suspend fun acceptWaitlistOffer(entryId: String): ReservationOutcome<ReservationConfirmation> =
+        call(ReservationFunctions.ACCEPT_WAITLIST_OFFER, mapOf("entryId" to entryId)) { confirmationFrom(it) }
+
+    override suspend fun declineWaitlistOffer(entryId: String): ReservationOutcome<Unit> =
+        call(ReservationFunctions.DECLINE_WAITLIST_OFFER, mapOf("entryId" to entryId)) { }
 
     /**
      * Llama a una function y traduce la respuesta. [parse] devuelve null si la respuesta no tiene la

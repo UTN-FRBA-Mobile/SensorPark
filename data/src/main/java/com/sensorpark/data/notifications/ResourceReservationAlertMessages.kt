@@ -6,6 +6,7 @@ import com.sensorpark.domain.model.ActiveGeofence
 import com.sensorpark.domain.model.AppNotification
 import com.sensorpark.domain.model.NotificationAction
 import com.sensorpark.domain.model.NotificationType
+import com.sensorpark.domain.model.WaitlistEntry
 import com.sensorpark.domain.navigation.DeepLinks
 import com.sensorpark.domain.notification.ReservationAlertMessages
 import com.sensorpark.domain.reservation.ReservationRules
@@ -29,7 +30,7 @@ class ResourceReservationAlertMessages @Inject constructor(
         arrivesAt: java.time.Instant,
     ) = AppNotification(
         type = NotificationType.RESERVATION,
-        key = "reservationConfirmed$reservationId",
+        key = confirmedKey(reservationId),
         title = context.getString(R.string.notification_reservation_confirmed_title),
         body = context.getString(
             R.string.notification_reservation_confirmed_body,
@@ -47,7 +48,7 @@ class ResourceReservationAlertMessages @Inject constructor(
         arrivesAt: java.time.Instant,
     ) = AppNotification(
         type = NotificationType.REMINDER,
-        key = "reminder$reservationId",
+        key = reminderKey(reservationId),
         title = context.getString(R.string.notification_reminder_title),
         body = context.getString(R.string.notification_reminder_body, parkingLotName, spotCode, moment(arrivesAt)),
         deepLink = DeepLinks.reservation(reservationId),
@@ -55,7 +56,7 @@ class ResourceReservationAlertMessages @Inject constructor(
 
     override fun arrival(geofence: ActiveGeofence) = AppNotification(
         type = NotificationType.ARRIVAL,
-        key = "arrival${geofence.reservationId}",
+        key = arrivalKey(geofence.reservationId),
         title = context.getString(R.string.notification_arrival_title, geofence.parkingLotName),
         body = context.getString(R.string.notification_arrival_body, geofence.spotCode),
         deepLink = DeepLinks.checkIn(geofence.reservationId),
@@ -84,6 +85,31 @@ class ResourceReservationAlertMessages @Inject constructor(
     )
 
     override fun stayKey(reservationId: String) = "stay$reservationId"
+
+    override fun preArrivalKeys(reservationId: String) =
+        listOf(confirmedKey(reservationId), reminderKey(reservationId), arrivalKey(reservationId))
+
+    override fun waitlistOffer(entry: WaitlistEntry, parkingLotName: String) = AppNotification(
+        type = NotificationType.WAITLIST,
+        key = waitlistOfferKey(entry.id),
+        title = context.getString(R.string.notification_waitlist_offer_title, parkingLotName),
+        body = context.getString(
+            R.string.notification_waitlist_offer_body,
+            entry.offer?.spotCode.orEmpty(),
+            moment(entry.arrivesAt),
+            TIME.format(entry.endsAt),
+        ),
+        deepLink = DeepLinks.waitlistOffer(entry.id),
+    )
+
+    // La misma que arma SensorParkMessagingService con la push del backend: `type` + `id`.
+    override fun waitlistOfferKey(entryId: String) = "waitlist_offer$entryId"
+
+    private fun confirmedKey(reservationId: String) = "reservationConfirmed$reservationId"
+
+    private fun reminderKey(reservationId: String) = "reminder$reservationId"
+
+    private fun arrivalKey(reservationId: String) = "arrival$reservationId"
 
     /** "16:30" si es hoy; si no, "18/10 16:30". */
     private fun moment(instant: java.time.Instant): String {

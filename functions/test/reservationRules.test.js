@@ -208,3 +208,80 @@ describe("lista de espera", () => {
     assert.deepEqual(entries.sort(rules.waitlistCompare).map((e) => e.id), ["c", "b", "d", "a"]);
   });
 });
+
+describe("oferta de la lista de espera", () => {
+  // Una entrada que espera una franja; por defecto de 13 a 14, común, sin categoría.
+  const waiting = (id, overrides = {}) => ({
+    id, status: "WAITING", spotType: "STANDARD", category: "STANDARD",
+    arrivesAt: at("13:00"), endsAt: at("14:00"), durationMinutes: 60, requestedAt: at("10:00"),
+    ...overrides,
+  });
+
+  test("con un lugar libre se le ofrece al primero de la fila, no al que se anotó primero", () => {
+    const { offers } = rules.planOffers(
+      [waiting("primero"), waiting("con-prioridad", { category: "PREGNANT", requestedAt: at("11:00") })],
+      [spot("01")], [], NOW);
+    assert.deepEqual(offers.map((o) => o.entry.id), ["con-prioridad"]);
+    assert.equal(offers[0].spot.id, "01");
+  });
+
+  test("un lugar se ofrece una sola vez: el resto sigue esperando", () => {
+    const { offers } = rules.planOffers([waiting("a"), waiting("b", { requestedAt: at("10:05") })],
+      [spot("01")], [], NOW);
+    assert.deepEqual(offers.map((o) => o.entry.id), ["a"]);
+  });
+
+  test("con dos lugares libres salen dos ofertas", () => {
+    const { offers } = rules.planOffers([waiting("a"), waiting("b", { requestedAt: at("10:05") })],
+      [spot("01"), spot("02")], [], NOW);
+    assert.deepEqual(offers.map((o) => [o.entry.id, o.spot.id]), [["a", "01"], ["b", "02"]]);
+  });
+
+  test("sólo se ofrece si la franja liberada cubre la pedida", () => {
+    // El lugar está tomado de 13:30 a 15: no le sirve a quien pide de 13 a 14.
+    const { offers } = rules.planOffers([waiting("a")], [spot("01")],
+      [reservation("01", "13:30", "15:00")], NOW);
+    assert.equal(offers.length, 0);
+  });
+
+  test("si al primero no le entra, se le ofrece al siguiente al que sí", () => {
+    const { offers } = rules.planOffers(
+      [waiting("tarde", { arrivesAt: at("13:30"), endsAt: at("14:30") }),
+        waiting("temprano", { arrivesAt: at("12:30"), endsAt: at("13:00"), requestedAt: at("10:05") })],
+      [spot("01")], [reservation("01", "14:00", "15:00")], NOW);
+    assert.deepEqual(offers.map((o) => o.entry.id), ["temprano"]);
+  });
+
+  test("una oferta vigente guarda el lugar: no se vuelve a ofrecer ni se puede reservar", () => {
+    const held = rules.holdOf(waiting("a", { status: "OFFERED", offer: { spotId: "01" } }));
+    assert.equal(rules.planOffers([waiting("b")], [spot("01")], [held], NOW).offers.length, 0);
+    assert.equal(pick([spot("01")], { from: "13:00", to: "14:00", reservations: [held] }), null);
+  });
+
+  test("una entrada cuya franja ya empezó queda vencida", () => {
+    const { offers, stale } = rules.planOffers([waiting("a", { arrivesAt: at("11:00"), endsAt: at("12:00") })],
+      [spot("01")], [], NOW);
+    assert.equal(offers.length, 0);
+    assert.deepEqual(stale.map((e) => e.id), ["a"]);
+  });
+
+  test("las posiciones se cuentan por franja y tipo de lugar", () => {
+    const positions = rules.waitlistPositions([
+      waiting("a"),
+      waiting("b", { requestedAt: at("10:05") }),
+      waiting("c", { category: "REDUCED_MOBILITY", requestedAt: at("10:10") }),
+      waiting("otra-franja", { arrivesAt: at("15:00"), endsAt: at("16:00") }),
+      waiting("moto", { spotType: "MOTORCYCLE" }),
+    ]);
+    assert.deepEqual(Object.fromEntries(positions), { c: 1, a: 2, b: 3, "otra-franja": 1, moto: 1 });
+  });
+
+  test("aceptar o rechazar sólo se puede con una oferta vigente", () => {
+    const offered = waiting("a", { status: "OFFERED", offer: { spotId: "01", expiresAt: at("12:05") } });
+    assert.equal(rules.offerProblem(offered, NOW), null);
+    assert.equal(rules.offerProblem(offered, at("12:06")), "OFFER_EXPIRED");
+    assert.equal(rules.offerProblem(waiting("b"), NOW), "NO_OFFER");
+    assert.ok(rules.offerExpired(offered, at("12:06")));
+    assert.ok(!rules.offerExpired(offered, NOW));
+  });
+});

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  La Activity que levanta createComposeRule usa el tema de la aplicación. Sin esto hereda uno con
+  barra de título, que tapa el encabezado de la pantalla y ensucia las capturas de la demo.
+-->
+<resources>
+    <style name="Theme.SensorParkTest" parent="@android:style/Theme.Material.Light.NoActionBar" />
+</resources>

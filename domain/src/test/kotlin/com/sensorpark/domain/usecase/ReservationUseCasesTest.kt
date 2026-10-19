@@ -15,7 +15,10 @@ import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.SpotStatus
 import com.sensorpark.domain.model.SpotType
+import com.sensorpark.domain.model.WaitlistEntry
+import com.sensorpark.domain.model.WaitlistOffer
 import com.sensorpark.domain.model.WaitlistPosition
+import com.sensorpark.domain.model.WaitlistStatus
 import com.sensorpark.domain.repository.ReservationRepository
 import com.sensorpark.domain.reservation.ReservationRules
 import kotlinx.coroutines.flow.Flow
@@ -72,7 +75,25 @@ class ReservationUseCasesTest {
         }
 
         override suspend fun leaveWaitlist(entryId: String): ReservationOutcome<Unit> = ReservationOutcome.Success(Unit)
+
+        override fun myWaitlist(): Flow<DataResult<List<WaitlistEntry>>> = flowOf(DataResult.Success(emptyList()))
+
+        override suspend fun acceptWaitlistOffer(entryId: String): ReservationOutcome<ReservationConfirmation> {
+            calls += "acceptWaitlistOffer"
+            return ReservationOutcome.Success(ReservationConfirmation("r2", "01", "01", Instant.EPOCH, Instant.EPOCH, Instant.EPOCH))
+        }
+
+        override suspend fun declineWaitlistOffer(entryId: String): ReservationOutcome<Unit> {
+            calls += "declineWaitlistOffer"
+            return ReservationOutcome.Success(Unit)
+        }
     }
+
+    private fun entry(status: WaitlistStatus, expiresAt: Instant? = null) = WaitlistEntry(
+        "w1", "ana", "utn-medrano", SpotType.STANDARD, now.plus(Duration.ofHours(1)), 60, Category.STANDARD,
+        now.minus(Duration.ofMinutes(10)), status,
+        offer = expiresAt?.let { WaitlistOffer("01", "01", it.minus(ReservationRules.WAITLIST_OFFER_TIME), it) },
+    )
 
     private fun reservation(status: ReservationStatus, arrivesAt: Instant = now) = Reservation(
         "r-$status", "ana", "utn-medrano", "01", "01", SpotType.STANDARD, arrivesAt, 60,
@@ -177,5 +198,48 @@ class ReservationUseCasesTest {
             ReservationOutcome.Rejected(ReservationRejection.CATEGORY_REQUIRED),
             JoinWaitlistUseCase(full, clock)(request.copy(spotType = SpotType.PRIORITY), lot, Category.STANDARD),
         )
+    }
+
+    @Test
+    fun `aceptar una oferta vigente llega al backend`() = runTest {
+        val repo = FakeReservationRepository()
+        val offered = entry(WaitlistStatus.OFFERED, expiresAt = now.plus(Duration.ofMinutes(3)))
+        assertTrue(AcceptWaitlistOfferUseCase(repo, clock)(offered) is ReservationOutcome.Success)
+        assertEquals(listOf("acceptWaitlistOffer"), repo.calls)
+    }
+
+    @Test
+    fun `aceptar sin oferta o con la oferta vencida se rechaza sin llamar al backend`() = runTest {
+        val repo = FakeReservationRepository()
+        assertEquals(
+            ReservationOutcome.Rejected(ReservationRejection.NO_OFFER),
+            AcceptWaitlistOfferUseCase(repo, clock)(entry(WaitlistStatus.WAITING)),
+        )
+        assertEquals(
+            ReservationOutcome.Rejected(ReservationRejection.OFFER_EXPIRED),
+            AcceptWaitlistOfferUseCase(repo, clock)(entry(WaitlistStatus.OFFERED, expiresAt = now.minusSeconds(1))),
+        )
+        assertTrue(repo.calls.isEmpty())
+    }
+
+    @Test
+    fun `aceptar la oferta respeta el limite de reservas activas`() = runTest {
+        val full = FakeReservationRepository(listOf(reservation(ReservationStatus.CONFIRMED), reservation(ReservationStatus.IN_USE)))
+        assertEquals(
+            ReservationOutcome.Rejected(ReservationRejection.LIMIT_REACHED),
+            AcceptWaitlistOfferUseCase(full, clock)(entry(WaitlistStatus.OFFERED, expiresAt = now.plus(Duration.ofMinutes(3)))),
+        )
+        assertTrue(full.calls.isEmpty())
+    }
+
+    @Test
+    fun `rechazar sólo tiene sentido con una oferta, aunque esté vencida`() = runTest {
+        val repo = FakeReservationRepository()
+        assertEquals(
+            ReservationOutcome.Rejected(ReservationRejection.NO_OFFER),
+            DeclineWaitlistOfferUseCase(repo)(entry(WaitlistStatus.WAITING)),
+        )
+        assertTrue(DeclineWaitlistOfferUseCase(repo)(entry(WaitlistStatus.OFFERED, expiresAt = now.minusSeconds(1))) is ReservationOutcome.Success)
+        assertEquals(listOf("declineWaitlistOffer"), repo.calls)
     }
 }

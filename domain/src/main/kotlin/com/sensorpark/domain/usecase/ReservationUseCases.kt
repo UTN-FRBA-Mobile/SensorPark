@@ -14,6 +14,8 @@ import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.WaitlistPosition
+import com.sensorpark.domain.model.WaitlistEntry
+import com.sensorpark.domain.model.WaitlistStatus
 import com.sensorpark.domain.repository.ReservationRepository
 import com.sensorpark.domain.reservation.ReservationRules
 import kotlinx.coroutines.flow.first
@@ -108,5 +110,34 @@ class JoinWaitlistUseCase @Inject constructor(
         ReservationRules.validateRequest(request, lot, category, activeReservationsOfUser = 0, now = clock.instant())
             ?.let { return ReservationOutcome.Rejected(it) }
         return reservations.joinWaitlist(request)
+    }
+}
+
+/**
+ * Quedarse con el lugar que ofrece la lista de espera. Como al reservar, cuenta el límite de
+ * reservas activas: la oferta no lo saltea.
+ */
+class AcceptWaitlistOfferUseCase @Inject constructor(
+    private val reservations: ReservationRepository,
+    private val clock: Clock,
+) {
+    suspend operator fun invoke(entry: WaitlistEntry): ReservationOutcome<ReservationConfirmation> {
+        ReservationRules.offerProblem(entry, clock.instant())?.let { return ReservationOutcome.Rejected(it) }
+        val active = (reservations.myReservations().first() as? DataResult.Success)
+            ?.value?.count { it.status.isActive } ?: 0
+        if (active >= ReservationRules.MAX_ACTIVE_PER_USER) {
+            return ReservationOutcome.Rejected(ReservationRejection.LIMIT_REACHED)
+        }
+        return reservations.acceptWaitlistOffer(entry.id)
+    }
+}
+
+class DeclineWaitlistOfferUseCase @Inject constructor(
+    private val reservations: ReservationRepository,
+) {
+    suspend operator fun invoke(entry: WaitlistEntry): ReservationOutcome<Unit> {
+        // Una oferta vencida igual se puede rechazar: el backend la da por perdida y sigue la fila.
+        if (entry.status != WaitlistStatus.OFFERED) return ReservationOutcome.Rejected(ReservationRejection.NO_OFFER)
+        return reservations.declineWaitlistOffer(entry.id)
     }
 }

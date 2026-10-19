@@ -1,8 +1,16 @@
 package com.sensorpark.core.ui.components
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.sensorpark.core.ui.R
+import com.sensorpark.core.ui.theme.SensorParkTheme
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.reservation.ReservationRules
@@ -36,6 +44,12 @@ fun formatDuration(duration: Duration): String {
     return if (hours > 0) "$hours h ${minutes.toString().padStart(2, '0')} min" else "$minutes min"
 }
 
+/** "4:59": la cuenta regresiva de los minutos que dura una oferta de la lista de espera. */
+fun formatCountdown(duration: Duration): String {
+    val seconds = duration.seconds.coerceAtLeast(0)
+    return "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+}
+
 /** "1 h" o "30 min", para los chips de duración. */
 fun formatDurationMinutes(minutes: Int): String =
     if (minutes >= 60 && minutes % 60 == 0) "${minutes / 60} h" else "$minutes min"
@@ -61,8 +75,37 @@ fun ReservationRejection.message(): String = stringResource(
         ReservationRejection.INVALID_STATUS -> R.string.rejection_invalid_status
         ReservationRejection.ALREADY_IN_WAITLIST -> R.string.rejection_already_in_waitlist
         ReservationRejection.SPOT_NOT_TAKEN -> R.string.rejection_spot_not_taken
+        ReservationRejection.NO_OFFER -> R.string.rejection_no_offer
+        ReservationRejection.OFFER_EXPIRED -> R.string.rejection_offer_expired
     },
 )
+
+/**
+ * Pastilla con el estado de una reserva, con el mismo código de colores que el resto de la app.
+ * El color nunca es la única pista: la pastilla siempre lleva el texto del estado.
+ */
+@Composable
+fun ReservationStatusBadge(status: ReservationStatus, modifier: Modifier = Modifier) {
+    val colors = SensorParkTheme.colors
+    val color = when (status) {
+        ReservationStatus.CONFIRMED -> colors.positive
+        ReservationStatus.IN_USE -> colors.warning
+        ReservationStatus.EXPIRED -> colors.negative
+        ReservationStatus.FINISHED, ReservationStatus.CANCELLED -> colors.neutral
+    }
+    Surface(
+        color = color.container,
+        contentColor = color.content,
+        shape = RoundedCornerShape(50),
+        modifier = modifier,
+    ) {
+        Text(
+            text = status.label(),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        )
+    }
+}
 
 @Composable
 fun ReservationStatus.label(): String = stringResource(

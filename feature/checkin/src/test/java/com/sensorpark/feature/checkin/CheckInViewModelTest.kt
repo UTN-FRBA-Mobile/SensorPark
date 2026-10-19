@@ -1,5 +1,13 @@
 package com.sensorpark.feature.checkin
 
+import com.sensorpark.core.testing.FakeAlertMessages
+import com.sensorpark.core.testing.FakeGeofenceRepository
+import com.sensorpark.core.testing.FakeLocationRepository
+import com.sensorpark.core.testing.FakeParkingLotRepository
+import com.sensorpark.core.testing.FakeReminderScheduler
+import com.sensorpark.core.testing.FakeReservationRepository
+import com.sensorpark.core.testing.FakeSpotAvailabilityRepository
+import com.sensorpark.domain.model.CheckOutSummary
 import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.LocationReading
 import com.sensorpark.domain.model.ParkingLot
@@ -195,6 +203,9 @@ class CheckInViewModelTest {
     @Test
     fun elCheckOutMuestraElResumenYLiberaLaReserva() = runTest {
         val world = World()
+        // El resumen lo calcula el backend; acá se fija uno para comprobar que llega a la pantalla.
+        world.reservations.checkOutResult =
+            ReservationOutcome.Success(CheckOutSummary(stayMinutes = 45, amount = 750))
         world.reservations.emit(listOf(reservation(status = ReservationStatus.IN_USE)))
         val vm = world.viewModel()
         collecting(vm)
@@ -232,7 +243,7 @@ class CheckInViewModelTest {
                 geofences = geofences,
                 reminders = reminders,
                 notifications = notifications,
-                messages = FakeAlertMessages(),
+                messages = FakeAlertMessages,
                 clock = clock,
             ),
             clock = clock,

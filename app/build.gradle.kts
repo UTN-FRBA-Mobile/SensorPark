@@ -80,6 +80,9 @@ dependencies {
     debugImplementation(libs.ui.tooling)
     debugImplementation(libs.ui.test.manifest)
     testImplementation(libs.junit)
+    testImplementation(libs.coroutines.test)
+    // Repositorios falsos y datos de ejemplo (T04).
+    testImplementation(project(":core:testing"))
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.junit)

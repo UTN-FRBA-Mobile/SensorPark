@@ -16,6 +16,7 @@ import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.notification.InMemoryNotificationRepository
+import com.sensorpark.domain.model.WaitlistEntry
 import com.sensorpark.domain.notification.ReservationAlertMessages
 import com.sensorpark.domain.repository.GeofenceRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
@@ -90,6 +91,24 @@ class SyncReservationAlertsUseCaseTest {
         assertTrue(world.geofences.active().isEmpty())
         val stay = world.notifications.shown.value.firstOrNull { it.key == "stay$RESERVATION_ID" }
         assertTrue(stay?.ongoing == true)
+    }
+
+    @Test
+    fun alHacerCheckInSeSacanLosAvisosDeAntesDeLlegar() = runTest {
+        // Lo encontró el recorrido de la app en el emulador: el "hacé el check-in" y la
+        // confirmación seguían ahí después de hacer el check-in.
+        val world = World()
+        world.sync(listOf(reservation()))
+        world.notifications.notify(TestAlertMessages.arrival(world.geofences.find(RESERVATION_ID)!!))
+        assertEquals(
+            setOf("confirmed$RESERVATION_ID", "arrival$RESERVATION_ID"),
+            world.notifications.shown.value.map { it.key }.toSet(),
+        )
+
+        world.sync(listOf(reservation(status = ReservationStatus.IN_USE)))
+
+        // Queda sólo el aviso persistente de la estadía.
+        assertEquals(listOf("stay$RESERVATION_ID"), world.notifications.shown.value.map { it.key })
     }
 
     @Test
@@ -234,6 +253,14 @@ private object TestAlertMessages : ReservationAlertMessages {
     )
 
     override fun stayKey(reservationId: String) = "stay$reservationId"
+
+    override fun preArrivalKeys(reservationId: String) =
+        listOf("confirmed$reservationId", "reminder$reservationId", "arrival$reservationId")
+
+    override fun waitlistOffer(entry: WaitlistEntry, parkingLotName: String) =
+        AppNotification(NotificationType.WAITLIST, waitlistOfferKey(entry.id), "Se liberó un lugar", parkingLotName)
+
+    override fun waitlistOfferKey(entryId: String) = "waitlist_offer$entryId"
 }
 
 /** La reconciliación se prueba con `sync`, que recibe las listas: estos no se usan. */
@@ -259,6 +286,14 @@ private object UnusedReservationRepository : ReservationRepository {
         throw UnsupportedOperationException()
 
     override suspend fun leaveWaitlist(entryId: String): ReservationOutcome<Unit> =
+        throw UnsupportedOperationException()
+
+    override fun myWaitlist(): Flow<DataResult<List<WaitlistEntry>>> = flowOf(DataResult.Success(emptyList()))
+
+    override suspend fun acceptWaitlistOffer(entryId: String): ReservationOutcome<ReservationConfirmation> =
+        throw UnsupportedOperationException()
+
+    override suspend fun declineWaitlistOffer(entryId: String): ReservationOutcome<Unit> =
         throw UnsupportedOperationException()
 }
 
