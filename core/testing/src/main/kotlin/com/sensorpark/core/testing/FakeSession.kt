@@ -47,12 +47,18 @@ class FakeAuthRepository(
     }
 }
 
-/** Registro de dispositivo falso: sólo anota cuántas veces le pidieron registrar el token. */
+/** Registro de dispositivo falso: sólo anota cuántas veces le pidieron registrar y borrar el token. */
 class FakeDeviceRepository : DeviceRepository {
     var registrations = 0
+        private set
+    var unregistrations = 0
         private set
 
     override suspend fun registerCurrentToken() {
         registrations++
+    }
+
+    override suspend fun unregisterCurrentToken() {
+        unregistrations++
     }
 }

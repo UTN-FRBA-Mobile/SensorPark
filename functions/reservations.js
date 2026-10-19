@@ -7,7 +7,7 @@ const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const rules = require("./reservationRules");
-const { sendPush } = require("./push");
+const notifications = require("./notifications");
 
 const BOOKING_ROLES = ["DRIVER", "ADMIN"];
 
@@ -107,11 +107,6 @@ async function heldOffersOfLot(tx, db, lotId, now, exceptEntryId = null) {
   return docs.filter((d) => d.id !== exceptEntryId).map(waitlistEntryOf)
     .filter((e) => !rules.offerExpired(e, now)).map(rules.holdOf);
 }
-
-// "14:30", en la hora argentina, para el texto de los avisos.
-const localTime = (date) => new Intl.DateTimeFormat("es-AR", {
-  timeZone: rules.TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-}).format(date);
 
 function activeReservationsOfLot(db, lotId) {
   return db.collection("reservations")
@@ -363,7 +358,8 @@ exports.checkOut = onCall(async (request) => {
 // sale, rechaza o deja vencer su oferta. Es idempotente.
 //
 // Los avisos se mandan después de la transacción: si se reintenta, no salen dos veces.
-async function reconcileWaitlist(db, lotId, now) {
+// `messaging` reemplaza a FCM en los tests.
+async function reconcileWaitlist(db, lotId, now, { messaging } = {}) {
   const offers = await db.runTransaction(async (tx) => {
     const lotRef = db.doc(`parkingLots/${lotId}`);
     const lot = await tx.get(lotRef);
@@ -406,13 +402,9 @@ async function reconcileWaitlist(db, lotId, now) {
 
   for (const { entry, spot, lotName } of offers) {
     logger.info("Lugar ofrecido de la lista de espera", { entryId: entry.id, uid: entry.userId, lotId, spotId: spot.id });
-    await sendPush([entry.userId], {
-      type: "waitlist_offer",
-      id: entry.id,
-      title: `Se liberó un lugar en ${lotName}`,
-      body: `Lugar ${spot.code}, de ${localTime(entry.arrivesAt)} a ${localTime(entry.endsAt)}. ` +
-        `Tenés ${rules.WAITLIST_OFFER_MINUTES} minutos para quedártelo.`,
-    }, "WAITLIST").catch((e) => logger.warn("No se pudo mandar el aviso de la oferta", e));
+    await notifications.sendNotice(db, entry.userId, "waitlist_offer", entry.id, {
+      lotName, spotCode: spot.code, arrivesAt: entry.arrivesAt, endsAt: entry.endsAt,
+    }, { messaging }).catch((e) => logger.warn("No se pudo mandar el aviso de la oferta", e));
   }
   return offers.length;
 }
@@ -613,9 +605,10 @@ exports.offerReleasedSpots = onDocumentUpdated("reservations/{reservationId}", a
 });
 
 // Lo que hace el proceso de cada minuto, con la hora como parámetro para poder probarlo:
-// vence las reservas sin check-in y reserva los lugares de las que entraron en su ventana de "ahora".
-// Es idempotente: correrlo dos veces seguidas no cambia nada la segunda vez.
-async function processReservationsAt(db, now) {
+// vence las reservas sin check-in, reserva los lugares de las que entraron en su ventana de "ahora"
+// y manda los avisos que correspondan (ver notifications.js). `messaging` reemplaza a FCM en los tests.
+// Es idempotente: correrlo dos veces seguidas no cambia nada ni avisa de nuevo la segunda vez.
+async function processReservationsAt(db, now, { messaging } = {}) {
   let expired = 0;
   let reserved = 0;
 
@@ -623,15 +616,18 @@ async function processReservationsAt(db, now) {
     .where("status", "==", "CONFIRMED")
     .where("toleranceUntil", "<", Timestamp.fromDate(now)).get();
   for (const doc of overdue.docs) {
-    await db.runTransaction(async (tx) => {
-      const current = await tx.get(doc.ref);
-      const reservation = reservationOf(current);
-      if (!rules.isExpired(reservation, now)) return;
-      const release = await prepareSpotRelease(tx, db, reservation, now);
+    const reservation = await db.runTransaction(async (tx) => {
+      const current = reservationOf(await tx.get(doc.ref));
+      if (!rules.isExpired(current, now)) return null;
+      const release = await prepareSpotRelease(tx, db, current, now);
       tx.update(doc.ref, { status: "EXPIRED", expiredAt: FieldValue.serverTimestamp() });
       release();
-      expired++;
+      return current;
     });
+    if (!reservation) continue;
+    expired++;
+    // Una sola vez: la transacción pasa la reserva a EXPIRED una sola vez.
+    await notifyQuietly(db, reservation, "reservation_expired", messaging);
   }
 
   const windowEnd = new Date(now.getTime() + rules.NOW_WINDOW_MINUTES * 60 * 1000);
@@ -665,9 +661,51 @@ async function processReservationsAt(db, now) {
       offersMissed++;
     });
   }
-  for (const lotId of lotsToReconcile) await reconcileWaitlist(db, lotId, now);
+  for (const lotId of lotsToReconcile) await reconcileWaitlist(db, lotId, now, { messaging });
 
-  return { expired, reserved, offersMissed };
+
+  const notified = await sendDueNotices(db, now, messaging);
+  return { expired, reserved, offersMissed, notified };
+}
+
+// Avisos que dependen de la hora: reserva por vencer, franja por terminar y estadía prolongada.
+// Antes de mandar cada uno se marca en la reserva (`notices.<clave>`) dentro de una transacción:
+// si dos corridas se pisan, sólo una lo marca y lo manda. Si el envío falla, no se reintenta:
+// es preferible perder un aviso a mandarlo repetido.
+async function sendDueNotices(db, now, messaging) {
+  const expiringFrom = new Date(now.getTime() + notifications.EXPIRING_NOTICE_MINUTES * 60 * 1000);
+  const endingFrom = new Date(now.getTime() + notifications.ENDING_NOTICE_MINUTES * 60 * 1000);
+  const [confirmed, inUse] = await Promise.all([
+    db.collection("reservations").where("status", "==", "CONFIRMED")
+      .where("toleranceUntil", "<=", Timestamp.fromDate(expiringFrom)).get(),
+    db.collection("reservations").where("status", "==", "IN_USE")
+      .where("endsAt", "<=", Timestamp.fromDate(endingFrom)).get(),
+  ]);
+
+  let notified = 0;
+  for (const doc of [...confirmed.docs, ...inUse.docs]) {
+    if (!notifications.dueNotice(reservationOf(doc), now)) continue;
+    const claimed = await db.runTransaction(async (tx) => {
+      const current = reservationOf(await tx.get(doc.ref));
+      const type = notifications.dueNotice(current, now);
+      if (!type) return null;
+      tx.update(doc.ref, { [`notices.${notifications.NOTICES[type].notice}`]: Timestamp.fromDate(now) });
+      return { reservation: current, type };
+    });
+    if (!claimed) continue;
+    await notifyQuietly(db, claimed.reservation, claimed.type, messaging);
+    notified++;
+  }
+  return notified;
+}
+
+// Un aviso que no se pudo mandar queda en el log, pero no frena el resto del proceso.
+async function notifyQuietly(db, reservation, type, messaging) {
+  try {
+    await notifications.sendNotice(db, reservation.userId, type, reservation.id, reservation, { messaging });
+  } catch (error) {
+    logger.error("No se pudo mandar el aviso", { type, reservationId: reservation.id, error: error.message });
+  }
 }
 
 exports.processReservations = onSchedule("every 1 minutes", async () => {
