@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 @HiltViewModel
@@ -32,5 +33,22 @@ class SessionViewModel @Inject constructor(
         }
     }
 
-    fun signOut() = authRepository.signOut()
+    /**
+     * Antes de cerrar la sesión saca este teléfono de la cuenta, para que no le sigan llegando sus
+     * avisos. Sin conexión no espera más de unos segundos: si quedó registrado, el backend lo pasa
+     * a la próxima cuenta que inicie sesión acá.
+     */
+    fun signOut() {
+        viewModelScope.launch {
+            withTimeoutOrNull(UNREGISTER_TIMEOUT_MS) {
+                runCatching { deviceRepository.unregisterCurrentToken() }
+                    .onFailure { Log.w("SensorParkFcm", "No se pudo desregistrar el token FCM", it) }
+            }
+            authRepository.signOut()
+        }
+    }
+
+    private companion object {
+        const val UNREGISTER_TIMEOUT_MS = 3_000L
+    }
 }

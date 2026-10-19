@@ -35,14 +35,34 @@ service cloud.firestore {
         request.resource.data.category in ['STANDARD', 'PREGNANT', 'REDUCED_MOBILITY'];
     }
 
-    // Perfil, token FCM y preferencias. El dueño nunca escribe su rol: lo asigna el backend.
+    // Tipos de aviso que el usuario apagó en la app (`NotificationType`). El backend no le manda
+    // pushes de esos tipos (ver functions/notifications.js).
+    function validNotificationsDisabled() {
+      let data = request.resource.data;
+      return !('notificationsDisabled' in data) || (
+        data.notificationsDisabled is list &&
+        data.notificationsDisabled.hasOnly(['RESERVATION', 'REMINDER', 'ARRIVAL', 'WAITLIST']));
+    }
+
+    // Perfil y preferencias. El dueño nunca escribe su rol: lo asigna el backend.
     // Al registrarse puede pedir un rol con `requestedRole`; `ADMIN` no se puede pedir.
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid) && !('role' in request.resource.data) && validCategory() &&
+        validNotificationsDisabled() &&
         (!('requestedRole' in request.resource.data) ||
           request.resource.data.requestedRole in ['DRIVER', 'PARKING_ADMIN']);
-      allow update: if isOwner(uid) && !changes(['role', 'requestedRole']) && validCategory();
+      allow update: if isOwner(uid) && !changes(['role', 'requestedRole']) && validCategory() &&
+        validNotificationsDisabled();
+
+      // Un documento por teléfono donde el usuario tiene la sesión abierta, con su token FCM como id.
+      // Las functions mandan los avisos a todos.
+      match /devices/{token} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) &&
+          request.resource.data.keys().hasOnly(['token', 'updatedAt']) &&
+          request.resource.data.token == token;
+      }
     }
 
     // Estacionamientos. Los crea un administrador de estacionamiento, que queda como su único
