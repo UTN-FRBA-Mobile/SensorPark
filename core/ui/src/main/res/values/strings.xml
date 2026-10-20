@@ -6,6 +6,11 @@
     <string name="spot_type_motorcycle">Moto</string>
     <string name="spot_type_ev_charging">Carga eléctrica</string>
 
+    <string name="spot_status_free">Libre</string>
+    <string name="spot_status_occupied">Ocupado</string>
+    <string name="spot_status_reserved">Reservado</string>
+    <string name="spot_status_out_of_service">Fuera de servicio</string>
+
     <string name="availability_free">%1$d/%2$d libres</string>
     <string name="availability_full">Completo</string>
 
@@ -15,6 +20,17 @@
     <string name="error_unknown">Algo salió mal.</string>
 
     <string name="action_retry">Reintentar</string>
+    <string name="action_confirm">Confirmar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_save">Guardar</string>
+    <string name="action_accept">Aceptar</string>
+    <string name="action_back">Volver</string>
+    <string name="parking_card_action_detail">Ver detalle</string>
+    <string name="loading">Cargando…</string>
+
+    <string name="offline_banner_message">Sin conexión. Los datos pueden estar desactualizados.</string>
+    <string name="offline_banner_last_updated">Última sincronización: %1$s</string>
+
     <string name="placeholder_detail">Pantalla provisoria</string>
 
     <!-- Estados de una reserva -->
