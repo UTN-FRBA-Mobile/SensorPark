@@ -8,9 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sensorpark.app.BuildConfig
 import com.sensorpark.app.R
 import com.sensorpark.app.ui.profile.CategorySelector
+import com.sensorpark.core.ui.theme.ThemeMode
 import com.sensorpark.domain.model.NotificationPreferences
 import com.sensorpark.domain.model.NotificationType
 import com.sensorpark.domain.model.Role
@@ -44,6 +49,7 @@ fun AccountScreen(
 ) {
     val category by vm.category.collectAsStateWithLifecycle()
     val notifications by vm.notifications.collectAsStateWithLifecycle()
+    val themeMode by vm.themeMode.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -56,6 +62,12 @@ fun AccountScreen(
                 Text(it.label(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+
+        HorizontalDivider()
+        ThemeSelector(
+            selected = themeMode,
+            onSelect = vm::setThemeMode,
+        )
 
         val current = category
         if (state.role == Role.DRIVER && current != null) {
@@ -84,6 +96,34 @@ fun AccountScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThemeSelector(
+    selected: ThemeMode,
+    onSelect: (ThemeMode) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.account_theme), style = MaterialTheme.typography.titleSmall)
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            ThemeMode.entries.forEachIndexed { index, mode ->
+                SegmentedButton(
+                    selected = mode == selected,
+                    onClick = { onSelect(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = ThemeMode.entries.size),
+                ) {
+                    Text(stringResource(mode.label()))
+                }
+            }
+        }
+    }
+}
+
+private fun ThemeMode.label(): Int = when (this) {
+    ThemeMode.SYSTEM -> R.string.account_theme_system
+    ThemeMode.LIGHT -> R.string.account_theme_light
+    ThemeMode.DARK -> R.string.account_theme_dark
+}
+
 /**
  * Un interruptor por tipo de aviso. Apagar uno acá además se copia al perfil en Firestore, para
  * que el backend tampoco mande la push.
@@ -93,15 +133,21 @@ private fun NotificationPreferences(
     preferences: NotificationPreferences,
     onToggle: (NotificationType, Boolean) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(stringResource(R.string.account_notifications), style = MaterialTheme.typography.titleSmall)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.account_notifications),
+            style = MaterialTheme.typography.titleSmall,
+        )
         NotificationType.entries.forEach { type ->
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(type.label()))
+                Text(
+                    text = stringResource(type.label()),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
                 Switch(
                     checked = preferences.isEnabled(type),
                     onCheckedChange = { onToggle(type, it) },

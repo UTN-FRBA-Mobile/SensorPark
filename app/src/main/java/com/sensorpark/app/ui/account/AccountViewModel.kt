@@ -3,6 +3,8 @@ package com.sensorpark.app.ui.account
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sensorpark.core.ui.theme.ThemeMode
+import com.sensorpark.data.preferences.ThemePreferencesStore
 import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.NotificationPreferences
 import com.sensorpark.domain.model.NotificationType
@@ -12,6 +14,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -20,6 +23,7 @@ import javax.inject.Inject
 class AccountViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val notificationPreferences: NotificationPreferencesRepository,
+    private val themePreferences: ThemePreferencesStore,
 ) : ViewModel() {
 
     /** null mientras se lee el perfil. */
@@ -31,6 +35,18 @@ class AccountViewModel @Inject constructor(
     val notifications: StateFlow<NotificationPreferences> = notificationPreferences.preferences
         .catch { Log.w(TAG, "No se pudieron leer las preferencias de avisos", it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotificationPreferences())
+
+    val themeMode: StateFlow<ThemeMode> = themePreferences.themeMode
+        .map { ThemeMode.from(it) }
+        .catch { Log.w(TAG, "No se pudo leer el tema", it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.SYSTEM)
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            runCatching { themePreferences.setThemeMode(mode.name) }
+                .onFailure { Log.w(TAG, "No se pudo guardar el tema", it) }
+        }
+    }
 
     fun setCategory(category: Category) {
         viewModelScope.launch {

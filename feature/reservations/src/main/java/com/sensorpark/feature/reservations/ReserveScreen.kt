@@ -18,6 +18,22 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import com.sensorpark.core.ui.components.PrimaryButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SelectableDates
@@ -97,24 +113,77 @@ private fun Form(state: ReserveState, vm: ReserveViewModel, onOpenMyReservations
 
         HorizontalDivider()
 
-        Text(stringResource(R.string.reserve_when), style = MaterialTheme.typography.titleSmall)
-        OutlinedButton(onClick = { pickingDate = true }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.reserve_date, state.form.date.dayOfMonth, state.form.date.monthValue))
+        Text(
+            text = stringResource(R.string.reserve_when),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+        )
+        OutlinedButton(
+            onClick = { pickingDate = true },
+            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.CalendarToday,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = stringResource(R.string.reserve_date, state.form.date.dayOfMonth, state.form.date.monthValue),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                )
+            }
         }
-        OutlinedButton(onClick = { pickingTime = true }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.reserve_time, formatTime(state.arrivesAt)))
+        OutlinedButton(
+            onClick = { pickingTime = true },
+            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Schedule,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = stringResource(R.string.reserve_time, formatTime(state.arrivesAt)),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                )
+            }
         }
 
-        Text(stringResource(R.string.reserve_duration), style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = stringResource(R.string.reserve_duration),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+        )
         Chips(
             options = state.durations,
             selected = state.form.durationMinutes,
             label = { formatDurationMinutes(it) },
             onSelect = vm::setDuration,
         )
-        Text(stringResource(R.string.reserve_slot, formatTime(state.arrivesAt), formatTime(state.endsAt)))
+        Text(
+            text = stringResource(R.string.reserve_slot, formatTime(state.arrivesAt), formatTime(state.endsAt)),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.primary,
+        )
 
-        Text(stringResource(R.string.reserve_spot_type), style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = stringResource(R.string.reserve_spot_type),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+        )
         Chips(
             options = state.spotTypes,
             selected = state.form.spotType,
@@ -122,21 +191,44 @@ private fun Form(state: ReserveState, vm: ReserveViewModel, onOpenMyReservations
             onSelect = vm::setSpotType,
         )
 
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AvailabilityBadge(free = state.freeNow, capacity = state.capacity)
-                Text(stringResource(R.string.reserve_free_now_hint))
-                Text(stringResource(R.string.reserve_estimated_amount, formatAmount(state.estimatedAmount)))
+                Text(
+                    text = stringResource(R.string.reserve_free_now_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(R.string.reserve_estimated_amount, formatAmount(state.estimatedAmount)),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
         }
 
-        Button(
+        Spacer(Modifier.height(4.dp))
+
+        PrimaryButton(
+            text = stringResource(if (state.working) R.string.reserve_working else R.string.reserve_confirm),
             onClick = vm::confirm,
-            enabled = !state.working && state.parkingLot != null,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(if (state.working) R.string.reserve_working else R.string.reserve_confirm))
-        }
+            enabled = state.parkingLot != null,
+            loading = state.working,
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                )
+            },
+        )
 
         state.rejection?.let {
             Problem(

@@ -86,6 +86,7 @@ adb shell am start -a android.intent.action.VIEW -d "sensorpark://check-in/123" 
 - **El código va en inglés:** módulos, paquetes, clases, funciones, colecciones y campos de
   Firestore, y nombres de Cloud Functions.
 - **Van en español:** los comentarios, los commits, la documentación y los textos que ve el usuario.
+- **Estilos y colores:** usar siempre `MaterialTheme.colorScheme` o `SensorParkTheme.colors` (`SensorParkColors`), nunca colores fijos (hardcodeados) en una pantalla. Los textos siempre van en `strings.xml`.
 - `main` es el entregable: siempre compila.
 - Cada tarea se hace en una rama propia que sale de `main` y vuelve por Pull Request.
 

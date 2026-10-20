@@ -17,6 +17,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -151,10 +161,14 @@ private fun Header(origin: SearchOrigin, mode: ViewMode, onToggleMode: () -> Uni
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.nearby_title), style = MaterialTheme.typography.headlineSmall)
+        Column(Modifier.weight(1f).padding(end = 8.dp)) {
             Text(
-                if (origin.fromUser) {
+                text = stringResource(R.string.nearby_title),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = if (origin.fromUser) {
                     stringResource(R.string.nearby_subtitle_user, formatDistance(NearbyParkingLotsViewModel.RADIUS_METERS))
                 } else {
                     stringResource(
@@ -163,7 +177,7 @@ private fun Header(origin: SearchOrigin, mode: ViewMode, onToggleMode: () -> Uni
                         stringResource(R.string.nearby_this_area),
                     )
                 },
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -173,8 +187,14 @@ private fun Header(origin: SearchOrigin, mode: ViewMode, onToggleMode: () -> Uni
                     selected = mode == option,
                     onClick = { if (mode != option) onToggleMode() },
                     shape = SegmentedButtonDefaults.itemShape(index, ViewMode.entries.size),
+                    icon = { SegmentedButtonDefaults.Icon(active = mode == option) },
                     label = {
-                        Text(stringResource(if (option == ViewMode.MAP) R.string.nearby_mode_map else R.string.nearby_mode_list))
+                        Text(
+                            text = stringResource(if (option == ViewMode.MAP) R.string.nearby_mode_map else R.string.nearby_mode_list),
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (mode == option) FontWeight.Bold else FontWeight.Normal,
+                            ),
+                        )
                     },
                 )
             }
@@ -250,6 +270,7 @@ private fun ParkingMap(
     val camera = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(origin.coordinates.toLatLng(), ZOOM)
     }
+    val scope = rememberCoroutineScope()
     val statusColors = SensorParkTheme.colors
     val density = LocalDensity.current.density
     // Cuando cambia desde dónde se busca (llegó la ubicación, o se buscó en otra zona), el mapa va ahí.
@@ -263,7 +284,11 @@ private fun ParkingMap(
             cameraPositionState = camera,
             // El punto azul sólo con permiso: sin él, Maps tira una excepción.
             properties = MapProperties(isMyLocationEnabled = showMyLocation),
-            uiSettings = MapUiSettings(zoomControlsEnabled = false, mapToolbarEnabled = false),
+            uiSettings = MapUiSettings(
+                zoomControlsEnabled = false,
+                mapToolbarEnabled = false,
+                myLocationButtonEnabled = false,
+            ),
             onMapClick = { onSelect(null) },
         ) {
             // `key`: cuando la lista cambia (un filtro, otra zona), cada marcador sigue siendo el
@@ -298,7 +323,29 @@ private fun ParkingMap(
             FilledTonalButton(
                 onClick = { onSearchHere(Coordinates(target.latitude, target.longitude)) },
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
+                shape = CircleShape,
             ) { Text(stringResource(R.string.nearby_search_here)) }
+        }
+
+        if (showMyLocation) {
+            FloatingActionButton(
+                onClick = {
+                    scope.launch {
+                        camera.animate(CameraUpdateFactory.newLatLngZoom(origin.coordinates.toLatLng(), ZOOM))
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp),
+                shape = RoundedCornerShape(14.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.primary,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.MyLocation,
+                    contentDescription = stringResource(R.string.location_ask_again),
+                )
+            }
         }
 
         selected?.let { nearby ->
@@ -321,22 +368,49 @@ private fun SelectedLot(
     modifier: Modifier = Modifier,
 ) {
     val lot = nearby.parkingLot
-    ElevatedCard(modifier = modifier.fillMaxWidth()) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(lot.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = lot.name,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                )
                 AvailabilityBadge(free = lot.freeSpots, capacity = lot.capacity)
             }
             Text(
-                "${formatDistance(nearby.distanceMeters)} · ${lot.address}",
+                text = "${formatDistance(nearby.distanceMeters)} · ${lot.address}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onOpen, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.nearby_open_detail))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(top = 4.dp),
+            ) {
+                Button(
+                    onClick = onOpen,
+                    modifier = Modifier.weight(1f),
+                    shape = CircleShape,
+                ) {
+                    Text(stringResource(R.string.nearby_open_detail), fontWeight = FontWeight.Bold)
                 }
-                OutlinedButton(onClick = onDirections, modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    onClick = onDirections,
+                    modifier = Modifier.weight(1f),
+                    shape = CircleShape,
+                ) {
                     Text(stringResource(R.string.nearby_directions))
                 }
             }
