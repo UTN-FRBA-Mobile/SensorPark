@@ -10,6 +10,17 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.platform.LocalContext
 
+enum class ThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK,
+    ;
+
+    companion object {
+        fun from(name: String?): ThemeMode = entries.firstOrNull { it.name == name } ?: SYSTEM
+    }
+}
+
 @Composable
 fun SensorParkTheme(
     dark: Boolean = isSystemInDarkTheme(),

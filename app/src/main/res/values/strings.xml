@@ -41,6 +41,10 @@
     <string name="account_role_driver">Conductor</string>
     <string name="account_role_parking_admin">Administrador de estacionamiento</string>
     <string name="account_role_admin">Administrador del sistema</string>
+    <string name="account_theme">Apariencia</string>
+    <string name="account_theme_system">Sistema</string>
+    <string name="account_theme_light">Claro</string>
+    <string name="account_theme_dark">Oscuro</string>
     <string name="account_notifications">Avisos</string>
     <string name="account_notifications_reservation">Reservas</string>
     <string name="account_notifications_reminder">Recordatorios</string>
