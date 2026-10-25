@@ -92,6 +92,10 @@ adb shell am start -a android.intent.action.VIEW -d "sensorpark://check-in/123" 
 
 ## Backend (Firebase)
 
+El contrato entre la app y el backend (cada colección, cada function y cada aviso) está en
+[docs/contract.md](docs/contract.md); las reglas de reserva, en
+[docs/reservation-rules.md](docs/reservation-rules.md).
+
 Las reglas, los índices y las functions no viajan en el APK: se despliegan aparte con la
 [Firebase CLI](https://firebase.google.com/docs/cli).
 
