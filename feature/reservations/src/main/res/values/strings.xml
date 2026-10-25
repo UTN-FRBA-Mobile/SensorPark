@@ -50,6 +50,9 @@
     <string name="my_reservations_cancel_confirm">Sí, cancelar</string>
     <string name="my_reservations_cancel_keep">No, dejarla</string>
     <string name="my_reservations_dismiss">Entendido</string>
+    <string name="my_reservations_saved_stays">Tus estadías guardadas en el teléfono</string>
+    <string name="my_reservations_stay_spot">Lugar %1$s · %2$s</string>
+    <string name="my_reservations_stay_summary">Estadía de %1$s · %2$s</string>
 
     <string name="my_reservations_waitlist">Listas de espera</string>
     <string name="my_reservations_waitlist_slot">%1$s · %2$s a %3$s</string>

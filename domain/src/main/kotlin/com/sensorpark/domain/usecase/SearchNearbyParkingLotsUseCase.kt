@@ -14,13 +14,17 @@ import javax.inject.Inject
 
 /**
  * Filtros de la búsqueda. Con [spotType], sólo los estacionamientos que tienen lugares de ese
- * tipo; con [onlyWithFreeSpots], sólo los que tienen alguno libre (del tipo pedido, si hay uno).
+ * tipo; con [onlyWithFreeSpots], sólo los que tienen alguno libre (del tipo pedido, si hay uno);
+ * con [favoriteIds], sólo esos, estén a la distancia que estén (T19).
  */
 data class ParkingLotFilter(
     val spotType: SpotType? = null,
     val onlyWithFreeSpots: Boolean = false,
+    val favoriteIds: Set<String>? = null,
 ) {
-    fun matches(lot: ParkingLot): Boolean = when {
+    fun matches(lot: ParkingLot): Boolean = (favoriteIds == null || lot.id in favoriteIds) && matchesSpots(lot)
+
+    private fun matchesSpots(lot: ParkingLot): Boolean = when {
         spotType == null -> !onlyWithFreeSpots || lot.freeSpots > 0
         onlyWithFreeSpots -> lot.freeSpotsOf(spotType) > 0
         else -> lot.capacityOf(spotType) > 0
@@ -56,7 +60,8 @@ class SearchNearbyParkingLotsUseCase @Inject constructor(
             lots.asSequence()
                 .filter(filter::matches)
                 .map { NearbyParkingLot(it, distanceMeters(origin, it.location)) }
-                .filter { it.distanceMeters <= radiusMeters }
+                // Los favoritos se muestran aunque queden lejos: son los que el usuario eligió.
+                .filter { filter.favoriteIds != null || it.distanceMeters <= radiusMeters }
                 .sortedBy { it.distanceMeters }
                 .toList()
     }

@@ -2,6 +2,7 @@ package com.sensorpark.feature.reservations
 
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeReservationRepository
+import com.sensorpark.core.testing.FakeStayHistoryRepository
 import com.sensorpark.core.testing.Samples
 import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.DataErrorReason
@@ -10,6 +11,7 @@ import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.model.SpotType
+import com.sensorpark.domain.model.Stay
 import com.sensorpark.domain.model.WaitlistStatus
 import com.sensorpark.domain.usecase.CancelReservationUseCase
 import kotlinx.coroutines.Dispatchers
@@ -147,6 +149,28 @@ class MyReservationsViewModelTest {
     }
 
     @Test
+    fun sinPoderLeerLasReservasMuestraLasEstadiasGuardadasEnElTelefono() = runTest {
+        val world = World()
+        val stay = Stay(
+            reservationId = "vieja",
+            parkingLotId = LOT.id,
+            parkingLotName = LOT.name,
+            spotCode = "07",
+            arrivesAt = NOW.minus(Duration.ofDays(2)),
+            checkedOutAt = NOW.minus(Duration.ofDays(2)).plus(Duration.ofMinutes(65)),
+            stayMinutes = 65,
+            amount = 1_083,
+        )
+        world.stays.emit(listOf(stay))
+        world.reservations.fail(DataErrorReason.NO_CONNECTION)
+        val vm = world.viewModel()
+        collecting(vm)
+
+        assertEquals(DataErrorReason.NO_CONNECTION, vm.state.value.failure)
+        assertEquals(listOf(stay), vm.state.value.savedStays)
+    }
+
+    @Test
     fun unErrorDeLaBaseSeMuestraSinRomperLaPantalla() = runTest {
         val world = World()
         world.reservations.fail(DataErrorReason.PERMISSION_DENIED)
@@ -192,11 +216,13 @@ class MyReservationsViewModelTest {
         val clock: Clock = Clock.fixed(NOW, ZoneOffset.UTC)
         val reservations = FakeReservationRepository()
         val parkingLots = FakeParkingLotRepository(listOf(LOT))
+        val stays = FakeStayHistoryRepository()
 
         fun viewModel() = MyReservationsViewModel(
             reservations = reservations,
             parkingLots = parkingLots,
             cancelReservation = CancelReservationUseCase(reservations),
+            stayHistory = stays,
             clock = clock,
         )
     }

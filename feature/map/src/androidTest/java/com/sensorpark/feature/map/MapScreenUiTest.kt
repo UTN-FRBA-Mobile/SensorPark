@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
+import com.sensorpark.core.testing.FakeFavoritesRepository
 import com.sensorpark.core.testing.FakeLocationRepository
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.Samples
@@ -35,10 +36,11 @@ class MapScreenUiTest {
         freeSpots = 0,
         freeSpotsByType = mapOf(SpotType.STANDARD to 0),
     )
+    private val favorites = FakeFavoritesRepository()
     private val parkingLots = FakeParkingLotRepository(listOf(Samples.UTN_MEDRANO, abasto))
 
     private fun viewModel(location: FakeLocationRepository) =
-        NearbyParkingLotsViewModel(SearchNearbyParkingLotsUseCase(parkingLots), location)
+        NearbyParkingLotsViewModel(SearchNearbyParkingLotsUseCase(parkingLots), location, favorites)
 
     @Test
     fun pideElPermisoExplicandoParaQueEsYSinPermisoSigueAndando() {

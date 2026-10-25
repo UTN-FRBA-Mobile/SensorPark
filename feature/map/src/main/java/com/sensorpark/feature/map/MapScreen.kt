@@ -114,6 +114,8 @@ fun MapScreen(
     val locating by vm.locating.collectAsStateWithLifecycle()
     val mode by vm.mode.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
+    val favorites by vm.favorites.collectAsStateWithLifecycle()
+    val onlyFavorites by vm.onlyFavorites.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // Cada vez que el usuario toca "Usar mi ubicación" se vuelve a explicar y a pedir el permiso.
     var permissionRequests by rememberSaveable { mutableIntStateOf(0) }
@@ -123,7 +125,7 @@ fun MapScreen(
     Column(Modifier.fillMaxSize()) {
         Header(origin = origin, mode = mode, onToggleMode = vm::toggleMode)
         if (locating) LinearProgressIndicator(Modifier.fillMaxWidth())
-        Filters(filter, vm::toggleOnlyWithFreeSpots, vm::selectSpotType)
+        Filters(filter, onlyFavorites, vm::toggleOnlyWithFreeSpots, vm::toggleOnlyFavorites, vm::selectSpotType)
         LocationNotice(
             access = access,
             onAskAgain = { permissionRequests++ },
@@ -147,7 +149,7 @@ fun MapScreen(
                         onOpen = onOpenParkingLot,
                         onDirections = { context.openDirections(it) },
                     )
-                    ViewMode.LIST -> ParkingList(current.value, filter, onOpenParkingLot)
+                    ViewMode.LIST -> ParkingList(current.value, filter, favorites, onOpenParkingLot, vm::toggleFavorite)
                 }
             }
         }
@@ -205,7 +207,9 @@ private fun Header(origin: SearchOrigin, mode: ViewMode, onToggleMode: () -> Uni
 @Composable
 private fun Filters(
     filter: ParkingLotFilter,
+    onlyFavorites: Boolean,
     onToggleOnlyWithFreeSpots: () -> Unit,
+    onToggleOnlyFavorites: () -> Unit,
     onSelectSpotType: (SpotType) -> Unit,
 ) {
     LazyRow(
@@ -219,7 +223,13 @@ private fun Filters(
                 label = { Text(stringResource(R.string.nearby_filter_free)) },
             )
         }
-        // El filtro "Favoritos" lo suma T19, acá.
+        item {
+            FilterChip(
+                selected = onlyFavorites,
+                onClick = onToggleOnlyFavorites,
+                label = { Text(stringResource(R.string.nearby_filter_favorites)) },
+            )
+        }
         items(listOf(SpotType.PRIORITY, SpotType.MOTORCYCLE, SpotType.EV_CHARGING)) { type ->
             FilterChip(
                 selected = filter.spotType == type,
@@ -419,7 +429,13 @@ private fun SelectedLot(
 }
 
 @Composable
-private fun ParkingList(lots: List<NearbyParkingLot>, filter: ParkingLotFilter, onOpen: (String) -> Unit) {
+private fun ParkingList(
+    lots: List<NearbyParkingLot>,
+    filter: ParkingLotFilter,
+    favorites: Set<String>,
+    onOpen: (String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
+) {
     if (lots.isEmpty()) {
         Text(
             stringResource(R.string.nearby_empty),
@@ -440,6 +456,8 @@ private fun ParkingList(lots: List<NearbyParkingLot>, filter: ParkingLotFilter, 
                 freeSpots = lot.freeSpots,
                 capacity = lot.capacity,
                 onClick = { onOpen(lot.id) },
+                favorite = lot.id in favorites,
+                onToggleFavorite = { onToggleFavorite(lot.id) },
                 modifier = Modifier.semantics { contentDescription = lot.name },
                 footer = type?.let {
                     stringResource(R.string.nearby_free_of_type, it.label(), lot.freeSpotsOf(it), lot.capacityOf(it))
