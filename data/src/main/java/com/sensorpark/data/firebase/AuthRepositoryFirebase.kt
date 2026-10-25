@@ -15,6 +15,7 @@ import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.Role
 import com.sensorpark.domain.model.Session
 import com.sensorpark.domain.repository.AuthRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -88,12 +89,22 @@ class AuthRepositoryFirebase @Inject constructor(
             }
         awaitClose { registration.remove() }
     }.distinctUntilChanged().map { roleInDocument ->
-        if (roleInDocument == null) null else roleFromToken()
+        if (roleInDocument == null) null else resolveRole(roleInDocument, ::roleFromToken)
     }
 
+    /**
+     * El rol del claim: con red, refrescando el token (trae el recién asignado); sin red, el del
+     * token guardado. Si tampoco hay token válido devuelve null, y [resolveRole] usa el del documento.
+     */
     private suspend fun roleFromToken(): Role? {
-        val token = auth.currentUser?.getIdToken(true)?.await() ?: return null
-        return Role.from(token.claims[ROLE_CLAIM])
+        val user = auth.currentUser ?: return null
+        val token = try {
+            withTimeout(REFRESH_TIMEOUT_MS) { user.getIdToken(true).await() }
+        } catch (e: Exception) {
+            if (e is CancellationException && e !is TimeoutCancellationException) throw e
+            runCatching { withTimeout(REFRESH_TIMEOUT_MS) { user.getIdToken(false).await() } }.getOrNull()
+        }
+        return token?.let { Role.from(it.claims[ROLE_CLAIM]) }
     }
 
     private suspend fun translatingErrors(action: suspend () -> Unit) {
@@ -118,5 +129,16 @@ class AuthRepositoryFirebase @Inject constructor(
     private companion object {
         const val TIMEOUT_MS = 15_000L
         const val ROLE_CLAIM = "role"
+
+        /** Cuánto se espera a refrescar el token antes de seguir con lo guardado (sin red no vuelve). */
+        const val REFRESH_TIMEOUT_MS = 5_000L
     }
 }
+
+/**
+ * Qué rol vale: el del claim, que es el que leen las reglas, o si no se puede leer (sin red y sin un
+ * token vigente) el que el backend copió en `users/{uid}.role`. Con eso la app abre sin conexión en
+ * vez de quedarse en "Preparando tu cuenta…" (T19: favoritos e historial con modo avión).
+ */
+internal suspend fun resolveRole(roleInDocument: String, fromToken: suspend () -> Role?): Role? =
+    fromToken() ?: Role.from(roleInDocument)
