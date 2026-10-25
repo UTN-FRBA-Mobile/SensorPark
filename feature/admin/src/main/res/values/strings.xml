@@ -70,4 +70,8 @@
     <string name="admin_today_expired">Vencidas</string>
     <string name="admin_today_none">Hoy todavía no hay reservas.</string>
     <string name="admin_today_reservation">Lugar %1$s · %2$s a %3$s</string>
+    <string name="admin_today_chart">Ocupación por hora</string>
+    <string name="admin_today_chart_hour">%1$d h</string>
+    <string name="admin_today_chart_peak">La hora con más reservas es las %1$d, con %2$d.</string>
+    <string name="admin_today_chart_empty">Todavía no hay reservas hoy para mostrar la ocupación.</string>
 </resources>
