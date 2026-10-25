@@ -160,7 +160,10 @@ enum class ReservationRejection {
     NO_OFFER,
 
     /** Se pasaron los minutos de la oferta: el lugar ya pasó al siguiente de la fila. */
-    OFFER_EXPIRED;
+    OFFER_EXPIRED,
+
+    /** Sacar de servicio o borrar un lugar con una reserva activa o una oferta de la lista de espera. */
+    SPOT_HAS_RESERVATION;
 
     companion object {
         fun from(value: Any?): ReservationRejection? = entries.firstOrNull { it.name == value }

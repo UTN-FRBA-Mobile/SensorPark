@@ -57,6 +57,7 @@
     <string name="rejection_spot_not_taken">Tu lugar no figura ocupado por otro auto.</string>
     <string name="rejection_no_offer">No tenés una oferta pendiente para esta lista de espera.</string>
     <string name="rejection_offer_expired">Se pasaron los 5 minutos: el lugar pasó al siguiente de la fila.</string>
+    <string name="rejection_spot_has_reservation">El lugar tiene una reserva activa o se lo está guardando la lista de espera. Probá cuando se libere.</string>
     <string name="favorite_add">Guardar %1$s en favoritos</string>
     <string name="favorite_remove">Sacar %1$s de favoritos</string>
 </resources>

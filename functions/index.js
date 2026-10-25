@@ -108,6 +108,11 @@ exports.declineWaitlistOffer = reservations.declineWaitlistOffer;
 exports.offerReleasedSpots = reservations.offerReleasedSpots;
 exports.processReservations = reservations.processReservations;
 
+// Panel del administrador de estacionamiento (T22): lo que las reglas solas no pueden validar.
+const admin = require("./admin");
+exports.setSpotService = admin.setSpotService;
+exports.deleteSpot = admin.deleteSpot;
+
 // Confirma al conductor que su reserva quedó registrada. Le llega también a sus otros dispositivos.
 exports.notifyReservationCreated = onDocumentCreated("reservations/{reservationId}", async (event) => {
   const reservation = event.data.data();

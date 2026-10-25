@@ -4,7 +4,7 @@
 import { after, before, beforeEach, describe, test } from "node:test";
 import { readFileSync } from "node:fs";
 import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from "firebase/firestore";
 
 let testEnv;
 
@@ -244,6 +244,14 @@ describe("reservas", () => {
   test("el encargado tampoco escribe reservas", async () => {
     await assertFails(updateDoc(doc(parkingAdmin("encargado"), "reservations/r1"), { status: "EXPIRED" }));
     await assertFails(setDoc(doc(parkingAdmin("encargado"), "reservations/r3"), { userId: "ana", parkingLotId: "e1" }));
+  });
+
+  // La solapa "Hoy" del panel (T22) consulta las reservas de su estacionamiento por el día.
+  test("el encargado lista las reservas de su estacionamiento, y no las de otro", async () => {
+    const ofLot = (db, lotId) => getDocs(query(collection(db, "reservations"), where("parkingLotId", "==", lotId)));
+    await assertSucceeds(ofLot(parkingAdmin("encargado"), "e1"));
+    await assertFails(ofLot(parkingAdmin("otro"), "e1"));
+    await assertFails(getDocs(collection(parkingAdmin("encargado"), "reservations")));
   });
 });
 
