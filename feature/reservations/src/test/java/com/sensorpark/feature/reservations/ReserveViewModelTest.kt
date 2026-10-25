@@ -2,7 +2,9 @@ package com.sensorpark.feature.reservations
 
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeReservationRepository
+import com.sensorpark.core.testing.FakeSpotAvailabilityRepository
 import com.sensorpark.core.testing.FakeUserRepository
+import com.sensorpark.core.testing.Samples
 import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.ParkingLot
@@ -146,6 +148,39 @@ class ReserveViewModelTest {
     }
 
     @Test
+    fun conUnLugarElegidoEnElPlanoPideEseLugarYSuTipo() = runTest {
+        val world = World()
+        val vm = world.viewModel()
+        collecting(vm)
+        vm.load(LOT.id, spotId = "spot-11")
+
+        assertEquals("11", vm.state.value.spot?.code)
+        assertEquals(SpotType.MOTORCYCLE, vm.state.value.spotType)
+
+        vm.confirm()
+
+        val request = world.reservations.created.single()
+        assertEquals("spot-11", request.spotId)
+        assertEquals(SpotType.MOTORCYCLE, request.spotType)
+    }
+
+    @Test
+    fun elegirUnTipoDejaDePedirElLugarPuntual() = runTest {
+        val world = World()
+        val vm = world.viewModel()
+        collecting(vm)
+        vm.load(LOT.id, spotId = "spot-11")
+
+        vm.setSpotType(SpotType.STANDARD)
+        vm.confirm()
+
+        assertNull(vm.state.value.spot)
+        val request = world.reservations.created.single()
+        assertNull(request.spotId)
+        assertEquals(SpotType.STANDARD, request.spotType)
+    }
+
+    @Test
     fun sinLugarSePuedeAnotarEnLaListaDeEsperaConElMismoPedido() = runTest {
         val world = World()
         world.reservations.createResult = ReservationOutcome.Rejected(ReservationRejection.NO_SPOTS)
@@ -186,12 +221,16 @@ class ReserveViewModelTest {
         val reservations = FakeReservationRepository()
         val parkingLots = FakeParkingLotRepository(listOf(LOT))
         val users = FakeUserRepository(category)
+        val spots = FakeSpotAvailabilityRepository(
+            Samples.availability(Samples.spot("07"), Samples.spot("11", type = SpotType.MOTORCYCLE)),
+        )
 
         fun viewModel() = ReserveViewModel(
             parkingLots = parkingLots,
             users = users,
             createReservation = CreateReservationUseCase(reservations, clock),
             enterWaitlist = JoinWaitlistUseCase(reservations, clock),
+            spots = spots,
             clock = clock,
         )
     }
