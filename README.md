@@ -92,6 +92,7 @@ adb shell am start -a android.intent.action.VIEW -d "sensorpark://check-in/123" 
 
 ## Backend (Firebase)
 
+El paso a paso para llevar la app al proyecto real está en [docs/integracion.md](docs/integracion.md).
 El contrato entre la app y el backend (cada colección, cada function y cada aviso) está en
 [docs/contract.md](docs/contract.md); las reglas de reserva, en
 [docs/reservation-rules.md](docs/reservation-rules.md).
@@ -110,7 +111,8 @@ firebase deploy --only firestore:rules,firestore:indexes,functions
   mantienen los contadores de lugares libres, mandan las pushes y simulan los sensores. Antes de desplegar, copiá `functions/.env.example` a
   `functions/.env` y poné en `ADMIN_EMAILS` los emails que entran como administradores.
 - `functions/seed.js`: datos semilla (3 estacionamientos de 14 lugares, 42 en total). En el
-  proyecto real los carga un usuario `ADMIN` llamando a la function `loadSeed`; se puede
+  proyecto real los carga un usuario `ADMIN` con la function `loadSeed` (botón "Cargar datos
+  semilla" en Cuenta > Diagnóstico de configuración); se puede
   repetir sin duplicar y deja todos los lugares libres.
 - **Emuladores**, para probar sin tocar la base real. Necesitan Java 21 o superior:
 
