@@ -172,7 +172,7 @@ con respaldo fuera de él (si se pierde, no se puede volver a actualizar la app)
 `local.properties` o, en CI, con variables de entorno de los mismos nombres:
 
 ```properties
-SENSORPARK_STORE_FILE=C:\ruta\al\sensorpark.jks
+SENSORPARK_STORE_FILE=C:/ruta/al/sensorpark.jks
 SENSORPARK_STORE_PASSWORD=...
 SENSORPARK_KEY_ALIAS=sensorpark
 SENSORPARK_KEY_PASSWORD=...
