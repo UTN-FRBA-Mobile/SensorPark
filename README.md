@@ -164,3 +164,24 @@ junto, módulo por módulo para que no se pisen en el mismo emulador:
 ```
 
 El guion de la demo y cómo ensayarla están en [docs/guion-demo.md](docs/guion-demo.md).
+
+## Versión firmada (T25)
+
+El release minifica con R8 y se firma con el keystore del equipo, que **no** va al repo: se guarda
+con respaldo fuera de él (si se pierde, no se puede volver a actualizar la app). Se apunta desde
+`local.properties` o, en CI, con variables de entorno de los mismos nombres:
+
+```properties
+SENSORPARK_STORE_FILE=C:\ruta\al\sensorpark.jks
+SENSORPARK_STORE_PASSWORD=...
+SENSORPARK_KEY_ALIAS=sensorpark
+SENSORPARK_KEY_PASSWORD=...
+```
+
+```
+./gradlew :app:bundleRelease     # app/build/outputs/bundle/release/app-release.aab, para Play
+./gradlew :app:assembleRelease   # app/build/outputs/apk/release/app-release.apk, instalable directo
+```
+
+Sin esos datos el release sale sin firmar: sirve para revisar que compile y que R8 no rompa nada.
+Los cambios de cada versión están en [CHANGELOG.md](CHANGELOG.md).
