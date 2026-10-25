@@ -77,6 +77,7 @@ fun ReservationRejection.message(): String = stringResource(
         ReservationRejection.SPOT_NOT_TAKEN -> R.string.rejection_spot_not_taken
         ReservationRejection.NO_OFFER -> R.string.rejection_no_offer
         ReservationRejection.OFFER_EXPIRED -> R.string.rejection_offer_expired
+        ReservationRejection.SPOT_HAS_RESERVATION -> R.string.rejection_spot_has_reservation
     },
 )
 
