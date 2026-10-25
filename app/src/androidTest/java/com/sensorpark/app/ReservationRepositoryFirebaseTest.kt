@@ -21,6 +21,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
@@ -51,6 +52,27 @@ class ReservationRepositoryFirebaseTest {
         lot.collection("spots").document("01")
             .set(mapOf("code" to "01", "type" to "STANDARD", "status" to "FREE", "updatedAt" to FieldValue.serverTimestamp())).await()
         signInAs("driver@sensorpark.test")
+        releaseActiveReservations()
+    }
+
+    /**
+     * El conductor de prueba es compartido: si una prueba a mano o una corrida cortada le dejó
+     * reservas activas, el límite de dos haría fallar estos tests por LIMIT_REACHED. Arranca sin ninguna.
+     */
+    private suspend fun releaseActiveReservations() {
+        val mine = (repository.myReservations().first() as? DataResult.Success)?.value.orEmpty()
+        mine.filter { it.status.isActive }.forEach {
+            if (it.status == ReservationStatus.IN_USE) repository.checkOut(it.id) else repository.cancel(it.id)
+        }
+    }
+
+    /** El estacionamiento de cada test se borra al terminar: si no, se acumulan y ensucian la semilla. */
+    @After
+    fun deleteParkingLot() = runBlocking<Unit> {
+        signInAs("admin@sensorpark.test")
+        val lot = db.collection("parkingLots").document(lotId)
+        lot.collection("spots").get().await().documents.forEach { it.reference.delete().await() }
+        lot.delete().await()
     }
 
     private fun request(durationMinutes: Int = 60) = ReservationRequest(
