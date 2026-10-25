@@ -56,7 +56,8 @@ class DiagnosticsViewModel @Inject constructor(
 
     fun runChecks() {
         _checks.value = listOf(AUTH, ROLE, FIRESTORE, FCM).map { Check(it, CheckStatus.RUNNING) } +
-            Check(PUSH, CheckStatus.NOT_RUN, "Tocá «Enviar push de prueba».")
+            Check(PUSH, CheckStatus.NOT_RUN, "Tocá «Enviar push de prueba».") +
+            Check(SEED, CheckStatus.NOT_RUN, "Sólo un ADMIN: carga o restablece los estacionamientos de la semilla.")
         viewModelScope.launch {
             check(AUTH) {
                 val user = auth.currentUser ?: error("No hay sesión iniciada.")
@@ -93,6 +94,20 @@ class DiagnosticsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Carga (o restablece) la semilla con la function `loadSeed`: es el paso de T23 para tener
+     * estacionamientos en el proyecto real. Sólo la acepta un ADMIN; deja todos los lugares libres.
+     */
+    fun loadSeed() {
+        update(Check(SEED, CheckStatus.RUNNING))
+        viewModelScope.launch {
+            check(SEED) {
+                val result = functions.getHttpsCallable("loadSeed").call().await().getData() as? Map<*, *>
+                "Cargados ${result?.get("parkingLots")} estacionamientos y ${result?.get("spots")} lugares."
+            }
+        }
+    }
+
     private suspend fun check(name: String, test: suspend () -> String) {
         val result = try {
             Check(name, CheckStatus.OK, withTimeout(TIMEOUT_MS) { test() })
@@ -114,5 +129,6 @@ class DiagnosticsViewModel @Inject constructor(
         const val FIRESTORE = "Firestore y reglas"
         const val FCM = "Token FCM"
         const val PUSH = "Functions + push"
+        const val SEED = "Datos semilla"
     }
 }

@@ -52,6 +52,9 @@ fun DiagnosticsScreen(vm: DiagnosticsViewModel = hiltViewModel()) {
             Button(onClick = vm::sendTestPush) { Text("Enviar push de prueba") }
             OutlinedButton(onClick = vm::runChecks) { Text("Reintentar") }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = vm::loadSeed) { Text("Cargar datos semilla") }
+        }
 
         ParkingLots(parkingLots)
 
