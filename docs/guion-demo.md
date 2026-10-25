@@ -71,8 +71,24 @@ Los tests de `app/src/androidTest` necesitan los emuladores de Firebase con la s
 `DeviceRepositoryFirebaseTest` además necesita el `google-services.json` del proyecto real: con
 uno de prueba, Firebase no entrega el token de push y el test falla.
 
+## Video de respaldo
+
+Grabado en el emulador contra los emuladores de Firebase, en tres partes de un par de minutos:
+el conductor (buscar, plano en vivo, reservar un lugar, check-in y check-out), la lista de espera
+(llenar Moto con otras dos cuentas, anotarse, liberar y aceptar la oferta) y el panel del
+administrador (agregar un lugar, sacar otro de servicio, el día y los datos). Los videos no van al
+repo: se comparten por el grupo.
+
+Para volver a grabar una parte, con el emulador mostrando la pantalla de inicio de esa parte:
+
+```
+adb shell screenrecord --time-limit 170 /sdcard/demo.mp4
+adb pull /sdcard/demo.mp4
+```
+
+(`screenrecord` corta solo a los 170 segundos, o antes con Ctrl+C.)
+
 ## Pendiente del equipo
 
 - Ensayar la demo completa con los cinco, cronometrando, y ajustar los tiempos de esta tabla.
-- Grabar el video de respaldo del recorrido completo.
-- Repetir el ensayo contra el proyecto real cuando esté T23 (integración).
+- Repetir el ensayo y el video contra el proyecto real cuando esté T23 (integración).
