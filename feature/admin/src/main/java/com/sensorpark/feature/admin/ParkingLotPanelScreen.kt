@@ -1,5 +1,6 @@
 package com.sensorpark.feature.admin
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,7 +36,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -300,6 +306,7 @@ private fun SpotDialog(
 private fun TodayTab(vm: ParkingLotPanelViewModel) {
     val summary by vm.summary.collectAsStateWithLifecycle()
     val reservations by vm.todayReservations.collectAsStateWithLifecycle()
+    val hourly by vm.hourly.collectAsStateWithLifecycle()
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -326,6 +333,7 @@ private fun TodayTab(vm: ParkingLotPanelViewModel) {
                 Count(R.string.admin_today_expired, summary.expired)
             }
         }
+        item { HourlyChart(hourly) }
         if (reservations.isEmpty()) {
             item { Text(stringResource(R.string.admin_today_none), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
@@ -379,3 +387,46 @@ private fun Category.adminLabel(): String = stringResource(
         Category.STANDARD -> R.string.admin_category_standard
     },
 )
+
+/**
+ * Ocupación por hora de hoy: una barra por hora con cuántas reservas la cubren. TalkBack no ve el
+ * dibujo, así que la descripción dice la hora pico.
+ */
+@Composable
+private fun HourlyChart(hours: List<Int>) {
+    val max = hours.maxOrNull() ?: 0
+    val peak = hours.indexOf(max)
+    val description = if (max == 0) {
+        stringResource(R.string.admin_today_chart_empty)
+    } else {
+        stringResource(R.string.admin_today_chart_peak, peak, max)
+    }
+    val bar = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(stringResource(R.string.admin_today_chart), style = MaterialTheme.typography.titleMedium)
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .semantics { contentDescription = description },
+        ) {
+            val slot = size.width / hours.size
+            val gap = slot * 0.2f
+            hours.forEachIndexed { hour, count ->
+                val left = hour * slot + gap / 2
+                drawRect(track, topLeft = Offset(left, 0f), size = Size(slot - gap, size.height))
+                if (count > 0) {
+                    val height = size.height * count / max
+                    drawRect(bar, topLeft = Offset(left, size.height - height), size = Size(slot - gap, height))
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            listOf(0, 6, 12, 18, 23).forEach {
+                Text(stringResource(R.string.admin_today_chart_hour, it), style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
