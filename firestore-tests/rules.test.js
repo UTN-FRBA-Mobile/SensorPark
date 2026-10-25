@@ -118,6 +118,27 @@ describe("dispositivos", () => {
   });
 });
 
+describe("favoritos", () => {
+  test("el dueño guarda un favorito con el id del estacionamiento", () =>
+    assertSucceeds(setDoc(doc(driver("ana"), "users/ana/favorites/e1"), { parkingLotId: "e1" })));
+
+  test("el id del estacionamiento tiene que ser el del documento", () =>
+    assertFails(setDoc(doc(driver("ana"), "users/ana/favorites/e1"), { parkingLotId: "e2" })));
+
+  test("un favorito no guarda otros campos", () =>
+    assertFails(setDoc(doc(driver("ana"), "users/ana/favorites/e1"), { parkingLotId: "e1", role: "ADMIN" })));
+
+  test("otro usuario no ve, no agrega ni borra favoritos ajenos", async () => {
+    await testEnv.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "users/ana/favorites/e1"), { parkingLotId: "e1" }));
+    await assertFails(getDoc(doc(driver("beto"), "users/ana/favorites/e1")));
+    await assertFails(setDoc(doc(driver("beto"), "users/ana/favorites/e2"), { parkingLotId: "e2" }));
+    await assertFails(deleteDoc(doc(driver("beto"), "users/ana/favorites/e1")));
+    await assertSucceeds(getDoc(doc(driver("ana"), "users/ana/favorites/e1")));
+    await assertSucceeds(deleteDoc(doc(driver("ana"), "users/ana/favorites/e1")));
+  });
+});
+
 describe("estacionamientos", () => {
   test("cualquier autenticado los ve", () =>
     assertSucceeds(getDoc(doc(driver("ana"), "parkingLots/e1"))));

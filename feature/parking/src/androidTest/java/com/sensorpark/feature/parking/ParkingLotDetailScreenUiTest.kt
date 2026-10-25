@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import com.sensorpark.core.testing.FakeFavoritesRepository
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeSpotAvailabilityRepository
 import com.sensorpark.core.testing.Samples
@@ -37,7 +38,7 @@ class ParkingLotDetailScreenUiTest {
                 ParkingLotDetailScreen(
                     parkingLotId = Samples.UTN_MEDRANO.id,
                     onReserve = { reserved = it },
-                    vm = ParkingLotDetailViewModel(FakeParkingLotRepository()),
+                    vm = ParkingLotDetailViewModel(FakeParkingLotRepository(), FakeFavoritesRepository()),
                     spotsVm = SpotAvailabilityViewModel(FakeSpotAvailabilityRepository()),
                 )
             }
@@ -66,7 +67,7 @@ class ParkingLotDetailScreenUiTest {
                     parkingLotId = Samples.UTN_MEDRANO.id,
                     onReserve = {},
                     onReserveSpot = { _, spotId -> picked = spotId },
-                    vm = ParkingLotDetailViewModel(FakeParkingLotRepository()),
+                    vm = ParkingLotDetailViewModel(FakeParkingLotRepository(), FakeFavoritesRepository()),
                     spotsVm = SpotAvailabilityViewModel(spots),
                 )
             }
@@ -92,7 +93,7 @@ class ParkingLotDetailScreenUiTest {
                 ParkingLotDetailScreen(
                     parkingLotId = full.id,
                     onReserve = {},
-                    vm = ParkingLotDetailViewModel(FakeParkingLotRepository(listOf(full))),
+                    vm = ParkingLotDetailViewModel(FakeParkingLotRepository(listOf(full)), FakeFavoritesRepository()),
                     spotsVm = SpotAvailabilityViewModel(FakeSpotAvailabilityRepository()),
                 )
             }

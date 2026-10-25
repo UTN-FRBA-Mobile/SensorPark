@@ -15,6 +15,13 @@ import com.sensorpark.data.work.WorkManagerReminderScheduler
 import com.sensorpark.domain.notification.ReservationAlertMessages
 import com.sensorpark.domain.repository.AuthRepository
 import com.sensorpark.domain.repository.DeviceRepository
+import com.sensorpark.data.offline.FavoritesRemote
+import com.sensorpark.data.offline.FavoritesRemoteFirestore
+import com.sensorpark.data.offline.FavoritesRepositoryRoom
+import com.sensorpark.data.offline.FavoritesSyncScheduler
+import com.sensorpark.data.offline.StayHistoryRepositoryRoom
+import com.sensorpark.data.offline.WorkManagerFavoritesSyncScheduler
+import com.sensorpark.domain.repository.FavoritesRepository
 import com.sensorpark.domain.repository.GeofenceRepository
 import com.sensorpark.domain.repository.LocationRepository
 import com.sensorpark.domain.repository.NotificationPreferencesRepository
@@ -23,6 +30,7 @@ import com.sensorpark.domain.repository.ParkingLotRepository
 import com.sensorpark.domain.repository.ReminderScheduler
 import com.sensorpark.domain.repository.ReservationRepository
 import com.sensorpark.domain.repository.SpotAvailabilityRepository
+import com.sensorpark.domain.repository.StayHistoryRepository
 import com.sensorpark.domain.repository.UserRepository
 import dagger.Binds
 import dagger.Module
@@ -86,4 +94,19 @@ abstract class RepositoriesModule {
     @Binds
     @Singleton
     abstract fun reservationAlertMessages(impl: ResourceReservationAlertMessages): ReservationAlertMessages
+
+    // Favoritos e historial sin conexión (T19): Room en el teléfono, Firestore para sincronizar.
+    @Binds
+    @Singleton
+    abstract fun favoritesRepository(impl: FavoritesRepositoryRoom): FavoritesRepository
+
+    @Binds
+    abstract fun favoritesRemote(impl: FavoritesRemoteFirestore): FavoritesRemote
+
+    @Binds
+    abstract fun favoritesSyncScheduler(impl: WorkManagerFavoritesSyncScheduler): FavoritesSyncScheduler
+
+    @Binds
+    @Singleton
+    abstract fun stayHistoryRepository(impl: StayHistoryRepositoryRoom): StayHistoryRepository
 }

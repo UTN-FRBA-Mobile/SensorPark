@@ -46,6 +46,18 @@ class SearchNearbyParkingLotsUseCaseTest {
     }
 
     @Test
+    fun `con favoritos muestra solo esos, aunque esten fuera del radio`() {
+        val favorites = ParkingLotFilter(favoriteIds = setOf("parque-centenario"))
+        assertEquals(listOf("parque-centenario"), search(radiusMeters = 1_500.0, filter = favorites))
+        // Los demás filtros siguen valiendo sobre los favoritos.
+        assertEquals(
+            emptyList<String>(),
+            search(filter = favorites.copy(spotType = SpotType.STANDARD, onlyWithFreeSpots = true)),
+        )
+        assertEquals(emptyList<String>(), search(filter = ParkingLotFilter(favoriteIds = emptySet())))
+    }
+
+    @Test
     fun `informa la distancia de cada uno`() {
         val nearby = SearchNearbyParkingLotsUseCase.nearby(all, atUtn, 2_000.0, ParkingLotFilter())
         assertEquals(0.0, nearby[0].distanceMeters, 0.0)

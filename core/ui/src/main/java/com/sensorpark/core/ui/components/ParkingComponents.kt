@@ -25,9 +25,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.text.font.FontWeight
 import com.sensorpark.core.ui.R
 import com.sensorpark.core.ui.theme.SensorParkTheme
@@ -90,7 +93,8 @@ fun AvailabilityBadge(free: Int, capacity: Int, modifier: Modifier = Modifier) {
 
 /**
  * Tarjeta de un estacionamiento en una lista: nombre, una línea de detalle y la pastilla de libres.
- * [footer] es una línea opcional debajo, por ejemplo los libres del tipo filtrado.
+ * [footer] es una línea opcional debajo, por ejemplo los libres del tipo filtrado. Con [favorite]
+ * muestra el corazón para guardarlo en favoritos (T19).
  */
 @Composable
 fun ParkingLotCard(
@@ -101,6 +105,8 @@ fun ParkingLotCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     footer: String? = null,
+    favorite: Boolean? = null,
+    onToggleFavorite: () -> Unit = {},
 ) {
     Card(
         onClick = onClick,
@@ -123,6 +129,7 @@ fun ParkingLotCard(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
+                if (favorite != null) FavoriteButton(favorite, name, onToggleFavorite)
                 AvailabilityBadge(freeSpots, capacity)
             }
             Text(
@@ -220,3 +227,18 @@ private fun ErrorContentPreview() {
     }
 }
 
+
+/** El corazón de favoritos (T19). Dice en voz alta qué hace, para TalkBack. */
+@Composable
+fun FavoriteButton(favorite: Boolean, parkingLotName: String, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    IconButton(onClick = onToggle, modifier = modifier) {
+        Icon(
+            imageVector = if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+            contentDescription = stringResource(
+                if (favorite) R.string.favorite_remove else R.string.favorite_add,
+                parkingLotName,
+            ),
+            tint = if (favorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
