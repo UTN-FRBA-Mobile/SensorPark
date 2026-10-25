@@ -11,12 +11,14 @@ import com.sensorpark.domain.model.LocationReading
 import com.sensorpark.domain.model.NotificationPreferences
 import com.sensorpark.domain.model.NotificationType
 import com.sensorpark.domain.model.ParkingLot
+import com.sensorpark.domain.model.ParkingLotDraft
 import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationConfirmation
 import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRequest
 import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.model.SpotAvailability
+import com.sensorpark.domain.model.SpotDraft
 import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.model.Stay
@@ -28,6 +30,7 @@ import com.sensorpark.domain.repository.FavoritesRepository
 import com.sensorpark.domain.repository.GeofenceRepository
 import com.sensorpark.domain.repository.LocationRepository
 import com.sensorpark.domain.repository.NotificationPreferencesRepository
+import com.sensorpark.domain.repository.ParkingLotAdminRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
 import com.sensorpark.domain.repository.ReminderScheduler
 import com.sensorpark.domain.repository.ReservationRepository
@@ -500,4 +503,49 @@ class FakeStayHistoryRepository(stays: List<Stay> = emptyList()) : StayHistoryRe
     }
 
     override fun stays(): Flow<List<Stay>> = state.asStateFlow()
+}
+
+/** El panel del administrador (T22) en memoria: anota lo que se le pidió y deja elegir la respuesta. */
+class FakeParkingLotAdminRepository : ParkingLotAdminRepository {
+    val created = mutableListOf<ParkingLotDraft>()
+    val updated = mutableListOf<Pair<String, ParkingLotDraft>>()
+    val savedSpots = mutableListOf<SpotDraft>()
+    val serviceChanges = mutableListOf<Pair<String, Boolean>>()
+    val deletedSpots = mutableListOf<String>()
+    private val reservations = MutableStateFlow<List<Reservation>>(emptyList())
+
+    var createResult: DataResult<String> = DataResult.Success("lot-nuevo")
+    var spotResult: ReservationOutcome<Unit> = ReservationOutcome.Success(Unit)
+
+    fun emitReservations(today: List<Reservation>) {
+        reservations.value = today
+    }
+
+    override suspend fun create(draft: ParkingLotDraft): DataResult<String> {
+        created += draft
+        return createResult
+    }
+
+    override suspend fun update(parkingLotId: String, draft: ParkingLotDraft): DataResult<Unit> {
+        updated += parkingLotId to draft
+        return DataResult.Success(Unit)
+    }
+
+    override suspend fun saveSpot(parkingLotId: String, spot: SpotDraft): DataResult<Unit> {
+        savedSpots += spot
+        return DataResult.Success(Unit)
+    }
+
+    override suspend fun setSpotInService(parkingLotId: String, spotId: String, inService: Boolean): ReservationOutcome<Unit> {
+        serviceChanges += spotId to inService
+        return spotResult
+    }
+
+    override suspend fun deleteSpot(parkingLotId: String, spotId: String): ReservationOutcome<Unit> {
+        deletedSpots += spotId
+        return spotResult
+    }
+
+    override fun reservationsBetween(parkingLotId: String, from: Instant, until: Instant): Flow<DataResult<List<Reservation>>> =
+        reservations.map { list -> DataResult.Success(list.filter { it.arrivesAt >= from && it.arrivesAt < until }) }
 }

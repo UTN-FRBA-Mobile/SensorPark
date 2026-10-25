@@ -36,6 +36,9 @@ dependencies {
 
     debugImplementation(libs.ui.tooling)
     testImplementation(libs.junit)
+    testImplementation(libs.coroutines.test)
+    // Repositorios falsos y datos de ejemplo (T04).
+    testImplementation(project(":core:testing"))
 
     // Tests de UI: dibujan las pantallas de verdad en un emulador, sin Firebase.
     androidTestImplementation(project(":core:testing"))

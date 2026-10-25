@@ -7,10 +7,71 @@
     <string name="admin_panel_tab_spots">Lugares</string>
     <string name="admin_panel_tab_today">Hoy</string>
     <string name="admin_panel_tab_details">Datos</string>
-    <string name="admin_panel_spots_pending">Próximamente: el plano de lugares para agregar, cambiar el tipo o marcar fuera de servicio.</string>
-    <string name="admin_panel_today_pending">Próximamente: la ocupación y las reservas del día.</string>
-    <string name="admin_panel_details_pending">Próximamente: editar nombre, dirección, horario, tolerancia y tarifa.</string>
 
     <string name="admin_create_title">Crear estacionamiento</string>
-    <string name="admin_create_pending">Próximamente: el formulario de alta. Quien lo crea queda como su administrador.</string>
+    <string name="admin_cancel">Cancelar</string>
+    <string name="admin_dismiss">Entendido</string>
+
+    <!-- Formulario de los datos del estacionamiento. -->
+    <string name="admin_form_name">Nombre</string>
+    <string name="admin_form_name_error">Poné el nombre que ven los conductores.</string>
+    <string name="admin_form_address">Dirección</string>
+    <string name="admin_form_address_error">Poné la dirección.</string>
+    <string name="admin_form_latitude">Latitud</string>
+    <string name="admin_form_longitude">Longitud</string>
+    <string name="admin_form_location_error">Coordenadas inválidas, por ejemplo -34,5984 y -58,4200.</string>
+    <string name="admin_form_opens_at">Abre (HH:mm)</string>
+    <string name="admin_form_closes_at">Cierra (HH:mm)</string>
+    <string name="admin_form_schedule_error">Las dos horas o ninguna, y que abra antes de cerrar.</string>
+    <string name="admin_form_schedule_hint">Sin horario, se puede reservar a cualquier hora.</string>
+    <string name="admin_form_tolerance">Tolerancia de llegada (minutos)</string>
+    <string name="admin_form_tolerance_error">Entre %1$d y %2$d minutos.</string>
+    <string name="admin_form_radius">Radio del aviso de llegada (metros)</string>
+    <string name="admin_form_radius_error">Entre %1$d y %2$d metros.</string>
+    <string name="admin_form_rate">Tarifa por hora (pesos)</string>
+    <string name="admin_form_rate_error">Un número de pesos, sin centavos.</string>
+    <string name="admin_form_create">Crear estacionamiento</string>
+    <string name="admin_form_save">Guardar</string>
+    <string name="admin_form_saving">Guardando…</string>
+    <string name="admin_form_saved">Cambios guardados.</string>
+
+    <!-- Lugares. -->
+    <string name="admin_spots_add">Agregar lugar</string>
+    <string name="admin_spots_empty">Todavía no tiene lugares. Agregá el primero para que aparezca en la búsqueda.</string>
+    <string name="admin_spots_edit">Editar</string>
+    <string name="admin_spots_edit_title">Editar lugar</string>
+    <string name="admin_spots_out_of_service">Sacar de servicio</string>
+    <string name="admin_spots_back_in_service">Devolver a servicio</string>
+    <string name="admin_spots_delete">Borrar</string>
+    <string name="admin_spots_delete_title">¿Borrar el lugar %1$s?</string>
+    <string name="admin_spots_delete_body">Baja la capacidad del estacionamiento. No se puede borrar un lugar con una reserva activa.</string>
+    <string name="admin_spots_delete_confirm">Sí, borrar</string>
+    <string name="admin_spot_code">Lugar %1$s</string>
+    <string name="admin_spot_code_label">Código del lugar</string>
+    <string name="admin_spot_code_required">Poné el código pintado en el piso, por ejemplo 07.</string>
+    <string name="admin_spot_code_taken">Ya hay un lugar con ese código.</string>
+    <string name="admin_spot_type_for">%1$s · %2$s</string>
+    <string name="admin_spot_category">¿Para quién es?</string>
+    <string name="admin_spot_category_required">Elegí para qué categoría es el lugar preferencial.</string>
+    <string name="admin_category_pregnant">Embarazo</string>
+    <string name="admin_category_reduced_mobility">Movilidad reducida</string>
+    <string name="admin_category_standard">Sin prioridad</string>
+
+    <!-- El día. -->
+    <string name="admin_today_spots">Lugares ahora</string>
+    <string name="admin_today_free">Libres</string>
+    <string name="admin_today_occupied">Ocupados</string>
+    <string name="admin_today_reserved">Reservados</string>
+    <string name="admin_today_out_of_service">Fuera de servicio</string>
+    <string name="admin_today_reservations">Reservas de hoy: %1$d</string>
+    <string name="admin_today_active">Activas</string>
+    <string name="admin_today_finished">Terminadas</string>
+    <string name="admin_today_cancelled">Canceladas</string>
+    <string name="admin_today_expired">Vencidas</string>
+    <string name="admin_today_none">Hoy todavía no hay reservas.</string>
+    <string name="admin_today_reservation">Lugar %1$s · %2$s a %3$s</string>
+    <string name="admin_today_chart">Ocupación por hora</string>
+    <string name="admin_today_chart_hour">%1$d h</string>
+    <string name="admin_today_chart_peak">El pico es a las %1$d h, con %2$d reservas.</string>
+    <string name="admin_today_chart_empty">Todavía no hay reservas hoy para mostrar la ocupación.</string>
 </resources>

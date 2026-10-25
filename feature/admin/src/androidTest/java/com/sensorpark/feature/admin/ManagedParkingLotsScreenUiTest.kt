@@ -1,6 +1,6 @@
 package com.sensorpark.feature.admin
 
-import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -80,9 +80,8 @@ class ManagedParkingLotsScreenUiTest {
         }
 
         compose.onNodeWithText("Todavía no administrás ningún estacionamiento", substring = true).assertExists()
-        // El botón flotante no expone "Crear" en su semántica (el texto queda en un nodo aparte que no
-        // se puede tocar), así que se lo busca como lo único tocable de la pantalla vacía.
-        compose.onNode(hasClickAction()).performClick()
+        // Por su descripción, que es lo que anuncia TalkBack.
+        compose.onNodeWithContentDescription("Crear").performClick()
         assertTrue(create)
     }
 }

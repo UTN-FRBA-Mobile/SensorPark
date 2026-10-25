@@ -308,7 +308,14 @@ private fun NavGraphBuilder.parkingLotsTab(nav: NavHostController, uid: String, 
             ParkingLotPanelScreen(parkingLotId = entry.arguments?.getString(Route.ARG_PARKING_LOT_ID).orEmpty())
         }
         composable(Route.CreateParkingLot.pattern) {
-            CreateParkingLotScreen()
+            CreateParkingLotScreen(
+                // Al panel del nuevo, para cargarle los lugares; "atrás" vuelve a la lista, no al formulario.
+                onCreated = { id ->
+                    nav.navigate(Route.ParkingLotPanel.create(id)) {
+                        popUpTo(Route.CreateParkingLot.pattern) { inclusive = true }
+                    }
+                },
+            )
         }
     }
 }

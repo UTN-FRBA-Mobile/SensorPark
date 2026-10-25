@@ -2,6 +2,7 @@ package com.sensorpark.data.di
 
 import com.sensorpark.data.firebase.AuthRepositoryFirebase
 import com.sensorpark.data.firebase.DeviceRepositoryFirebase
+import com.sensorpark.data.firebase.ParkingLotAdminRepositoryFirebase
 import com.sensorpark.data.firebase.ParkingLotRepositoryFirebase
 import com.sensorpark.data.firebase.ReservationRepositoryFirebase
 import com.sensorpark.data.firebase.SpotAvailabilityRepositoryFirebase
@@ -26,6 +27,7 @@ import com.sensorpark.domain.repository.GeofenceRepository
 import com.sensorpark.domain.repository.LocationRepository
 import com.sensorpark.domain.repository.NotificationPreferencesRepository
 import com.sensorpark.domain.repository.NotificationRepository
+import com.sensorpark.domain.repository.ParkingLotAdminRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
 import com.sensorpark.domain.repository.ReminderScheduler
 import com.sensorpark.domain.repository.ReservationRepository
@@ -109,4 +111,8 @@ abstract class RepositoriesModule {
     @Binds
     @Singleton
     abstract fun stayHistoryRepository(impl: StayHistoryRepositoryRoom): StayHistoryRepository
+
+    // Panel del administrador de estacionamiento (T22).
+    @Binds
+    abstract fun parkingLotAdminRepository(impl: ParkingLotAdminRepositoryFirebase): ParkingLotAdminRepository
 }
