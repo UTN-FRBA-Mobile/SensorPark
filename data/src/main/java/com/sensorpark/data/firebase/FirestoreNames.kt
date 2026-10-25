@@ -11,6 +11,9 @@ object Collections {
     const val RESERVATIONS = "reservations"
     const val WAITLIST = "waitlist"
 
+    /** Subcolección de cada usuario: sus estacionamientos favoritos (T19), con el id del estacionamiento. */
+    const val FAVORITES = "favorites"
+
     /** Subcolección de cada usuario: un documento por teléfono, con su token FCM como id. */
     const val DEVICES = "devices"
 }
@@ -120,4 +123,10 @@ object ReservationFunctions {
     const val LEAVE_WAITLIST = "leaveWaitlist"
     const val ACCEPT_WAITLIST_OFFER = "acceptWaitlistOffer"
     const val DECLINE_WAITLIST_OFFER = "declineWaitlistOffer"
+}
+
+/** Campos de `users/{uid}/favorites/{parkingLotId}`; ver firestore.rules. */
+object FavoriteFields {
+    const val PARKING_LOT_ID = "parkingLotId"
+    const val ADDED_AT = "addedAt"
 }

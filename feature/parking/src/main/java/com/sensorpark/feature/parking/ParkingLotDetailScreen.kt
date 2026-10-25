@@ -42,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sensorpark.core.ui.components.AvailabilityBadge
 import com.sensorpark.core.ui.components.ErrorContent
+import com.sensorpark.core.ui.components.FavoriteButton
 import com.sensorpark.core.ui.components.LoadingContent
 import com.sensorpark.core.ui.components.OfflineBanner
 import com.sensorpark.core.ui.components.label
@@ -74,6 +75,7 @@ fun ParkingLotDetailScreen(
     val result by vm.result.collectAsStateWithLifecycle()
     // El listener de los lugares vive sólo mientras la pantalla está visible.
     val spots by spotsVm.state.collectAsStateWithLifecycle()
+    val favorite by vm.isFavorite.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
         when (val current = result) {
@@ -85,6 +87,8 @@ fun ParkingLotDetailScreen(
                 onReserve = { onReserve(parkingLotId) },
                 onReserveSpot = { onReserveSpot(parkingLotId, it.id) },
                 onRetrySpots = spotsVm::retry,
+                favorite = favorite,
+                onToggleFavorite = vm::toggleFavorite,
             )
         }
     }
@@ -102,6 +106,8 @@ private fun Detail(
     onReserve: () -> Unit,
     onReserveSpot: (Spot) -> Unit,
     onRetrySpots: () -> Unit,
+    favorite: Boolean,
+    onToggleFavorite: () -> Unit,
 ) {
     val full: LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
     LazyVerticalGrid(
@@ -113,11 +119,15 @@ private fun Detail(
     ) {
         item(key = "header", span = full) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = lot.name,
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = lot.name,
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    FavoriteButton(favorite = favorite, parkingLotName = lot.name, onToggle = onToggleFavorite)
+                }
                 Text(
                     text = lot.address,
                     style = MaterialTheme.typography.bodyMedium,

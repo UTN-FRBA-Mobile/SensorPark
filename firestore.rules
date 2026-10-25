@@ -63,6 +63,15 @@ service cloud.firestore {
           request.resource.data.keys().hasOnly(['token', 'updatedAt']) &&
           request.resource.data.token == token;
       }
+
+      // Sus estacionamientos favoritos (T19), con el id del estacionamiento como id. Sólo los ve y
+      // los cambia su dueño; la app los guarda también en el teléfono para verlos sin conexión.
+      match /favorites/{parkingLotId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) &&
+          request.resource.data.keys().hasOnly(['parkingLotId', 'addedAt']) &&
+          request.resource.data.parkingLotId == parkingLotId;
+      }
     }
 
     // Estacionamientos. Los crea un administrador de estacionamiento, que queda como su único

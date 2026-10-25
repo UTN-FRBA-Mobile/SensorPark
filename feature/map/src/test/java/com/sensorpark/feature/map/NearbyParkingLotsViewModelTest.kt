@@ -1,5 +1,6 @@
 package com.sensorpark.feature.map
 
+import com.sensorpark.core.testing.FakeFavoritesRepository
 import com.sensorpark.core.testing.FakeLocationRepository
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.Samples
@@ -42,6 +43,7 @@ class NearbyParkingLotsViewModelTest {
         name = "Playa Belgrano",
         location = Coordinates(-34.5627, -58.4563),
     )
+    private val favorites = FakeFavoritesRepository()
     private val parkingLots = FakeParkingLotRepository(listOf(Samples.UTN_MEDRANO, abasto, belgrano))
 
     /** Una ubicación en Belgrano, lejos de la zona por defecto. */
@@ -59,7 +61,7 @@ class NearbyParkingLotsViewModelTest {
     }
 
     private fun viewModel(location: FakeLocationRepository) =
-        NearbyParkingLotsViewModel(SearchNearbyParkingLotsUseCase(parkingLots), location)
+        NearbyParkingLotsViewModel(SearchNearbyParkingLotsUseCase(parkingLots), location, favorites)
 
     private fun NearbyParkingLotsViewModel.ids(): List<String> =
         (result.value as DataResult.Success<List<NearbyParkingLot>>).value.map { it.parkingLot.id }
@@ -171,6 +173,26 @@ class NearbyParkingLotsViewModelTest {
 
         vm.toggleOnlyWithFreeSpots()
         assertNull(vm.selected.value)
+    }
+
+    @Test
+    fun elFiltroFavoritosMuestraSoloLosGuardadosAunqueQuedenLejos() = runTest {
+        val vm = viewModel(FakeLocationRepository(permission = false, reading = null))
+        collecting(vm)
+
+        vm.toggleFavorite("belgrano")
+        vm.toggleFavorite("abasto")
+        assertEquals(setOf("belgrano", "abasto"), favorites.current)
+
+        vm.toggleOnlyFavorites()
+        // Belgrano está fuera del radio desde Medrano, pero es favorito: se muestra igual.
+        assertEquals(listOf("abasto", "belgrano"), vm.ids())
+
+        vm.toggleFavorite("abasto")
+        assertEquals(listOf("belgrano"), vm.ids())
+
+        vm.toggleOnlyFavorites()
+        assertEquals(listOf("utn-medrano", "abasto"), vm.ids())
     }
 
     @Test

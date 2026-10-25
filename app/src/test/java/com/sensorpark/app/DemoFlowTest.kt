@@ -6,6 +6,7 @@ import com.sensorpark.core.testing.FakeLocationRepository
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeReminderScheduler
 import com.sensorpark.core.testing.FakeReservationRepository
+import com.sensorpark.core.testing.FakeStayHistoryRepository
 import com.sensorpark.core.testing.FakeSpotAvailabilityRepository
 import com.sensorpark.core.testing.FakeUserRepository
 import com.sensorpark.core.testing.Samples
@@ -108,6 +109,7 @@ class DemoFlowTest {
         reservations = reservations,
         parkingLots = parkingLots,
         cancelReservation = CancelReservationUseCase(reservations),
+        stayHistory = FakeStayHistoryRepository(),
         clock = clock,
     )
 

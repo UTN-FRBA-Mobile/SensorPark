@@ -6,6 +6,7 @@ import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.DataResult
 import com.sensorpark.domain.model.NearbyParkingLot
 import com.sensorpark.domain.model.SpotType
+import com.sensorpark.domain.repository.FavoritesRepository
 import com.sensorpark.domain.repository.LocationRepository
 import com.sensorpark.domain.usecase.ParkingLotFilter
 import com.sensorpark.domain.usecase.SearchNearbyParkingLotsUseCase
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.onStart
@@ -52,7 +54,17 @@ enum class ViewMode { MAP, LIST }
 class NearbyParkingLotsViewModel @Inject constructor(
     search: SearchNearbyParkingLotsUseCase,
     private val location: LocationRepository,
+    private val favoritesRepository: FavoritesRepository,
 ) : ViewModel() {
+
+    /** Los favoritos del usuario (T19), guardados en el teléfono: se ven también sin conexión. */
+    val favorites: StateFlow<Set<String>> = favoritesRepository.favorites()
+        .catch { emit(emptySet()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** El filtro "Favoritos": sólo los guardados, estén a la distancia que estén. */
+    private val _onlyFavorites = MutableStateFlow(false)
+    val onlyFavorites: StateFlow<Boolean> = _onlyFavorites.asStateFlow()
 
     private val _filter = MutableStateFlow(ParkingLotFilter())
     val filter: StateFlow<ParkingLotFilter> = _filter.asStateFlow()
@@ -83,7 +95,9 @@ class NearbyParkingLotsViewModel @Inject constructor(
      * el nuevo: si pasara por null, la pantalla tiraría abajo el mapa y lo volvería a armar.
      */
     val result: StateFlow<DataResult<List<NearbyParkingLot>>?> =
-        combine(_origin, _filter, retries) { origin, filter, _ -> origin to filter }
+        combine(_origin, _filter, _onlyFavorites, favorites, retries) { origin, filter, onlyFavorites, favorites, _ ->
+            origin to filter.copy(favoriteIds = favorites.takeIf { onlyFavorites })
+        }
             .flatMapLatest { (origin, filter) -> search(origin.coordinates, RADIUS_METERS, filter) }
             .onStart<DataResult<List<NearbyParkingLot>>?> { emit(null) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -139,6 +153,12 @@ class NearbyParkingLotsViewModel @Inject constructor(
 
     /** Elegir el tipo que ya estaba elegido lo saca. */
     fun selectSpotType(type: SpotType) = _filter.update { it.copy(spotType = type.takeIf { t -> t != it.spotType }) }
+
+    fun toggleOnlyFavorites() = _onlyFavorites.update { !it }
+
+    fun toggleFavorite(parkingLotId: String) {
+        viewModelScope.launch { favoritesRepository.setFavorite(parkingLotId, parkingLotId !in favorites.value) }
+    }
 
     fun retry() = retries.update { it + 1 }
 

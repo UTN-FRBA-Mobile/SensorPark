@@ -63,7 +63,11 @@ interface GeofenceDao {
     suspend fun delete(reservationId: String)
 }
 
-@Database(entities = [GeofenceEntity::class], version = 1, exportSchema = false)
+@Database(entities = [GeofenceEntity::class, FavoriteEntity::class, StayEntity::class], version = 2, exportSchema = false)
 abstract class SensorParkDatabase : RoomDatabase() {
     abstract fun geofences(): GeofenceDao
+
+    abstract fun favorites(): FavoriteDao
+
+    abstract fun stays(): StayDao
 }
