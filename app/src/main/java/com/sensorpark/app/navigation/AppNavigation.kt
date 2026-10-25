@@ -233,11 +233,21 @@ private fun NavGraphBuilder.searchTab(nav: NavHostController) {
             ParkingLotDetailScreen(
                 parkingLotId = entry.arguments?.getString(Route.ARG_PARKING_LOT_ID).orEmpty(),
                 onReserve = { nav.navigate(Route.Reserve.create(it)) },
+                onReserveSpot = { lotId, spotId -> nav.navigate(Route.Reserve.create(lotId, spotId)) },
             )
         }
-        composable(Route.Reserve.pattern) { entry ->
+        composable(
+            route = Route.Reserve.pattern,
+            arguments = listOf(
+                navArgument(Route.ARG_SPOT_ID) {
+                    type = NavType.StringType
+                    nullable = true
+                },
+            ),
+        ) { entry ->
             ReserveScreen(
                 parkingLotId = entry.arguments?.getString(Route.ARG_PARKING_LOT_ID).orEmpty(),
+                spotId = entry.arguments?.getString(Route.ARG_SPOT_ID),
                 // A la lista, donde está la reserva nueva: no a la pantalla que había quedado
                 // abierta en esa pestaña (por ejemplo el resumen de una reserva anterior).
                 onOpenMyReservations = { nav.openTabAtStart(Tab.RESERVATIONS) },

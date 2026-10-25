@@ -10,9 +10,11 @@ import com.sensorpark.domain.model.ReservationConfirmation
 import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationRequest
+import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.repository.ParkingLotRepository
+import com.sensorpark.domain.repository.SpotAvailabilityRepository
 import com.sensorpark.domain.repository.UserRepository
 import com.sensorpark.domain.reservation.ReservationRules
 import com.sensorpark.domain.usecase.CreateReservationUseCase
@@ -26,6 +28,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -55,7 +59,12 @@ data class ReserveState(
     val confirmation: ReservationConfirmation? = null,
     /** Cuando está, se anotó en la lista de espera de esta franja (T18). */
     val waitlist: WaitlistPosition? = null,
+    /** El lugar puntual que eligió en el plano (T12); sin él se pide un tipo de lugar. */
+    val spot: Spot? = null,
 ) {
+    /** El tipo que se reserva: el del lugar elegido, o el de los chips. */
+    val spotType: SpotType get() = spot?.type ?: form.spotType
+
     /** Sin lugar para la franja, se puede anotar en la lista de espera en vez de rendirse. */
     val canJoinWaitlist: Boolean get() = rejection == ReservationRejection.NO_SPOTS && waitlist == null
 
@@ -75,9 +84,9 @@ data class ReserveState(
         get() = ReservationRules.amount(parkingLot?.hourlyRate ?: 0, form.durationMinutes)
 
     /** Lugares libres de ese tipo ahora mismo. No garantiza la franja: eso lo decide el backend. */
-    val freeNow: Int get() = parkingLot?.freeSpotsOf(form.spotType) ?: 0
+    val freeNow: Int get() = parkingLot?.freeSpotsOf(spotType) ?: 0
 
-    val capacity: Int get() = parkingLot?.capacityOf(form.spotType) ?: 0
+    val capacity: Int get() = parkingLot?.capacityOf(spotType) ?: 0
 
     /** Sin lugar no se ofrece un error seco: se sugiere qué probar. Ver [ReserveAlternative]. */
     val alternatives: List<ReserveAlternative>
@@ -109,20 +118,36 @@ class ReserveViewModel @Inject constructor(
     private val users: UserRepository,
     private val createReservation: CreateReservationUseCase,
     private val enterWaitlist: JoinWaitlistUseCase,
+    private val spots: SpotAvailabilityRepository,
     private val clock: Clock,
 ) : ViewModel() {
 
     private val parkingLotId = MutableStateFlow<String?>(null)
+    private val spotId = MutableStateFlow<String?>(null)
     private val form = MutableStateFlow(defaultForm())
     private val action = MutableStateFlow(ActionState())
+
+    /** El lugar elegido en el plano, en vivo: su código y su tipo salen de la disponibilidad. */
+    private val pickedSpot = combine(parkingLotId.filterNotNull(), spotId) { lot, spot -> lot to spot }
+        .flatMapLatest { (lot, spot) ->
+            if (spot == null) {
+                flowOf(null)
+            } else {
+                spots.observeSpots(lot)
+                    .map { result -> (result as? DataResult.Success)?.value?.spots?.firstOrNull { it.id == spot } }
+                    .catch { emit(null) }
+            }
+        }
 
     val state: StateFlow<ReserveState> = combine(
         parkingLotId.filterNotNull().flatMapLatest { parkingLots.parkingLot(it) },
         users.category.catch { emit(Category.STANDARD) },
         form,
         action,
-    ) { lot, category, form, action ->
+        pickedSpot,
+    ) { lot, category, form, action, spot ->
         ReserveState(
+            spot = spot,
             loading = false,
             parkingLot = (lot as? DataResult.Success)?.value,
             category = category,
@@ -135,8 +160,10 @@ class ReserveViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReserveState(form = defaultForm()))
 
-    fun load(parkingLotId: String) {
+    /** [spotId] es el lugar puntual que se tocó en el plano; sin él se elige el tipo de lugar. */
+    fun load(parkingLotId: String, spotId: String? = null) {
         this.parkingLotId.value = parkingLotId
+        this.spotId.value = spotId
     }
 
     fun setDate(date: LocalDate) = form.update { it.copy(date = date) }
@@ -145,7 +172,11 @@ class ReserveViewModel @Inject constructor(
 
     fun setDuration(minutes: Int) = form.update { it.copy(durationMinutes = minutes) }
 
-    fun setSpotType(type: SpotType) = form.update { it.copy(spotType = type) }
+    /** Elegir un tipo deja de pedir el lugar puntual: el backend elige uno de ese tipo. */
+    fun setSpotType(type: SpotType) {
+        spotId.value = null
+        form.update { it.copy(spotType = type) }
+    }
 
     fun dismissError() = action.update { it.copy(rejection = null, failure = null) }
 
@@ -194,7 +225,8 @@ class ReserveViewModel @Inject constructor(
         parkingLotId = lot.id,
         arrivesAt = current.arrivesAt,
         durationMinutes = current.form.durationMinutes,
-        spotType = current.form.spotType,
+        spotType = current.spotType,
+        spotId = current.spot?.id,
     )
 
     /** Por defecto, llegar en media hora: la hora más común y siempre dentro de lo permitido. */
