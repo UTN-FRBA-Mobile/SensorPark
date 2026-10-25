@@ -20,6 +20,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -79,11 +81,13 @@ fun ManagedParkingLotsScreen(
                     }
             }
         }
+        val createLabel = stringResource(R.string.admin_lots_create)
         ExtendedFloatingActionButton(
             onClick = onCreateParkingLot,
             icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-            text = { Text(stringResource(R.string.admin_lots_create)) },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            text = { Text(createLabel) },
+            // El botón extendido no le pasa su texto a TalkBack: sin esto se anunciaría sólo "botón".
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).semantics { contentDescription = createLabel },
         )
     }
 }
