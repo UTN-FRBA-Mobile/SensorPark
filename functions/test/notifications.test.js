@@ -253,9 +253,10 @@ describe("envío y proceso de cada minuto", () => {
     const before = await user({ tokens: ["tel-compartido"] });
     const now = await user();
     await db.doc(`users/${now}/devices/tel-compartido`).set({ token: "tel-compartido" });
-    // Lo saca el trigger claimDevice, que corre en el emulador de functions.
+    // Lo saca el trigger claimDevice, que corre en el emulador de functions. Con la suite entera el
+    // emulador viene cargado de triggers de otros tests y puede tardar: hasta 30 s.
     const old = db.doc(`users/${before}/devices/tel-compartido`);
-    for (let i = 0; i < 50 && (await old.get()).exists; i++) await new Promise((r) => setTimeout(r, 200));
+    for (let i = 0; i < 150 && (await old.get()).exists; i++) await new Promise((r) => setTimeout(r, 200));
     assert.equal((await old.get()).exists, false);
     assert.equal((await db.doc(`users/${now}/devices/tel-compartido`).get()).exists, true);
   });

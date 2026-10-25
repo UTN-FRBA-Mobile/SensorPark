@@ -150,3 +150,13 @@ Firebase, así que antes hay que levantarlos y cargar la semilla (ver arriba):
 ```
 ./gradlew :app:connectedDebugAndroidTest
 ```
+
+Los tests de UI de las pantallas (`feature/*/src/androidTest`) y el de Room (`data`) también corren
+en el emulador de Android, pero con los repositorios falsos de T04: no necesitan Firebase. Todo
+junto, módulo por módulo para que no se pisen en el mismo emulador:
+
+```
+./gradlew :data:connectedDebugAndroidTest :feature:map:connectedDebugAndroidTest :feature:parking:connectedDebugAndroidTest :feature:reservations:connectedDebugAndroidTest :feature:checkin:connectedDebugAndroidTest :feature:admin:connectedDebugAndroidTest --no-parallel
+```
+
+El guion de la demo y cómo ensayarla están en [docs/guion-demo.md](docs/guion-demo.md).
