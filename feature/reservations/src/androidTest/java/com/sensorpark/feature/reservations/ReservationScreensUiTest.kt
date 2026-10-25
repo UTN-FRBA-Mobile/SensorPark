@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeReservationRepository
+import com.sensorpark.core.testing.FakeSpotAvailabilityRepository
 import com.sensorpark.core.testing.FakeUserRepository
 import com.sensorpark.core.testing.Samples
 import com.sensorpark.core.ui.theme.SensorParkTheme
@@ -48,6 +49,7 @@ class ReservationScreensUiTest {
             users = users,
             createReservation = CreateReservationUseCase(reservations, clock),
             enterWaitlist = JoinWaitlistUseCase(reservations, clock),
+            spots = FakeSpotAvailabilityRepository(),
             clock = clock,
         )
         // Esta pantalla no tiene cuenta regresiva, así que el reloj automático de Compose

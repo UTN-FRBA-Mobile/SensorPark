@@ -14,8 +14,10 @@ sealed class Route(val pattern: String) {
         fun create(parkingLotId: String) = "parking-lot/$parkingLotId"
     }
 
-    data object Reserve : Route("reserve/{$ARG_PARKING_LOT_ID}") {
-        fun create(parkingLotId: String) = "reserve/$parkingLotId"
+    /** Con `spotId`, reserva ese lugar puntual, el que se tocó en el plano (T12). */
+    data object Reserve : Route("reserve/{$ARG_PARKING_LOT_ID}?$ARG_SPOT_ID={$ARG_SPOT_ID}") {
+        fun create(parkingLotId: String, spotId: String? = null) =
+            if (spotId == null) "reserve/$parkingLotId" else "reserve/$parkingLotId?$ARG_SPOT_ID=$spotId"
     }
 
     /** Destino del deep link `sensorpark://reservation/{id}`; sin id muestra la lista completa. */
@@ -46,5 +48,6 @@ sealed class Route(val pattern: String) {
 
     companion object {
         const val ARG_PARKING_LOT_ID = "parkingLotId"
+        const val ARG_SPOT_ID = "spotId"
     }
 }
