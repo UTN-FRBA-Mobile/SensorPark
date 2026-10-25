@@ -8,9 +8,11 @@ import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationStatus
+import com.sensorpark.domain.model.Stay
 import com.sensorpark.domain.model.WaitlistEntry
 import com.sensorpark.domain.repository.ParkingLotRepository
 import com.sensorpark.domain.repository.ReservationRepository
+import com.sensorpark.domain.repository.StayHistoryRepository
 import com.sensorpark.domain.usecase.CancelReservationUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +53,8 @@ data class MyReservationsState(
     val active: ReservationCard? = null,
     val upcoming: List<ReservationCard> = emptyList(),
     val history: List<ReservationCard> = emptyList(),
+    /** Sin poder leer Firestore (y sin su caché), las estadías guardadas en el teléfono (T19). */
+    val savedStays: List<Stay> = emptyList(),
     /** Listas de espera en las que sigue anotado: esperando o con una oferta para contestar (T18). */
     val waitlist: List<WaitlistCard> = emptyList(),
     val failure: DataErrorReason? = null,
@@ -72,6 +76,7 @@ class MyReservationsViewModel @Inject constructor(
     private val reservations: ReservationRepository,
     private val parkingLots: ParkingLotRepository,
     private val cancelReservation: CancelReservationUseCase,
+    private val stayHistory: StayHistoryRepository,
     private val clock: Clock,
 ) : ViewModel() {
 
@@ -82,10 +87,12 @@ class MyReservationsViewModel @Inject constructor(
         // Si la lista de espera no se puede leer, las reservas se muestran igual.
         reservations.myWaitlist().map { (it as? DataResult.Success)?.value.orEmpty() }.catch { emit(emptyList()) },
         parkingLots.parkingLots(),
+        // El historial guardado en el teléfono (T19): se muestra si Firestore no puede dar nada.
+        stayHistory.stays().catch { emit(emptyList()) },
         action,
-    ) { mine, waitlist, lots, action ->
+    ) { mine, waitlist, lots, stays, action ->
         when (mine) {
-            is DataResult.Failure -> MyReservationsState(loading = false, failure = mine.reason)
+            is DataResult.Failure -> MyReservationsState(loading = false, failure = mine.reason, savedStays = stays)
             is DataResult.Success -> {
                 val names = (lots as? DataResult.Success)?.value.orEmpty().associate { it.id to it.name }
                 val cards = mine.value.map { ReservationCard(it, names[it.parkingLotId].orEmpty()) }

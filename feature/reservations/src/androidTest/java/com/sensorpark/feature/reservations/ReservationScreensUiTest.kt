@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeReservationRepository
+import com.sensorpark.core.testing.FakeStayHistoryRepository
 import com.sensorpark.core.testing.FakeSpotAvailabilityRepository
 import com.sensorpark.core.testing.FakeUserRepository
 import com.sensorpark.core.testing.Samples
@@ -166,6 +167,7 @@ class ReservationScreensUiTest {
         reservations = reservations,
         parkingLots = parkingLots,
         cancelReservation = CancelReservationUseCase(reservations),
+        stayHistory = FakeStayHistoryRepository(),
         // Diez minutos después de la hora de ejemplo: la reserva ya está en tolerancia.
         clock = Clock.fixed(Samples.NOW.plus(Duration.ofMinutes(10)), ZoneOffset.UTC),
     )

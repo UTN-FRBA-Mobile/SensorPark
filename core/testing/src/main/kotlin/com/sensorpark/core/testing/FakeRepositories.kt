@@ -19,10 +19,12 @@ import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.model.SpotAvailability
 import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.SpotType
+import com.sensorpark.domain.model.Stay
 import com.sensorpark.domain.model.WaitlistEntry
 import com.sensorpark.domain.model.WaitlistOffer
 import com.sensorpark.domain.model.WaitlistPosition
 import com.sensorpark.domain.model.WaitlistStatus
+import com.sensorpark.domain.repository.FavoritesRepository
 import com.sensorpark.domain.repository.GeofenceRepository
 import com.sensorpark.domain.repository.LocationRepository
 import com.sensorpark.domain.repository.NotificationPreferencesRepository
@@ -30,6 +32,7 @@ import com.sensorpark.domain.repository.ParkingLotRepository
 import com.sensorpark.domain.repository.ReminderScheduler
 import com.sensorpark.domain.repository.ReservationRepository
 import com.sensorpark.domain.repository.SpotAvailabilityRepository
+import com.sensorpark.domain.repository.StayHistoryRepository
 import com.sensorpark.domain.repository.UserRepository
 import com.sensorpark.domain.reservation.ReservationRules
 import kotlinx.coroutines.flow.Flow
@@ -462,4 +465,39 @@ object FakeAlertMessages : com.sensorpark.domain.notification.ReservationAlertMe
     )
 
     override fun waitlistOfferKey(entryId: String) = "waitlist_offer$entryId"
+}
+
+/** Favoritos en memoria (T19). [synced] son los que "llegaron al backend" con [syncPending]. */
+class FakeFavoritesRepository(initial: Set<String> = emptySet()) : FavoritesRepository {
+    private val state = MutableStateFlow(initial)
+    val synced = mutableSetOf<String>()
+    var pendingChanges = 0
+        private set
+
+    val current: Set<String> get() = state.value
+
+    override fun favorites(): Flow<Set<String>> = state.asStateFlow()
+
+    override suspend fun setFavorite(parkingLotId: String, favorite: Boolean) {
+        state.update { if (favorite) it + parkingLotId else it - parkingLotId }
+        pendingChanges++
+    }
+
+    override suspend fun syncPending(): Boolean {
+        synced.clear()
+        synced += state.value
+        pendingChanges = 0
+        return true
+    }
+}
+
+/** El historial guardado en el teléfono (T19), con lo que el test le cargue. */
+class FakeStayHistoryRepository(stays: List<Stay> = emptyList()) : StayHistoryRepository {
+    private val state = MutableStateFlow(stays)
+
+    fun emit(stays: List<Stay>) {
+        state.value = stays
+    }
+
+    override fun stays(): Flow<List<Stay>> = state.asStateFlow()
 }

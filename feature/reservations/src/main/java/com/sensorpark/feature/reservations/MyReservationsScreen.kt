@@ -31,8 +31,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sensorpark.core.ui.components.ErrorContent
+import com.sensorpark.core.ui.components.OfflineBanner
 import com.sensorpark.core.ui.components.LoadingContent
 import com.sensorpark.core.ui.components.ReservationStatusBadge
+import com.sensorpark.core.ui.components.formatAmount
 import com.sensorpark.core.ui.components.formatCountdown
 import com.sensorpark.core.ui.components.formatDateAndTime
 import com.sensorpark.core.ui.components.formatDuration
@@ -41,8 +43,10 @@ import com.sensorpark.core.ui.components.label
 import com.sensorpark.core.ui.components.message
 import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationStatus
+import com.sensorpark.domain.model.Stay
 import com.sensorpark.domain.model.WaitlistStatus
 import kotlinx.coroutines.delay
+import java.time.Duration
 import java.time.Instant
 
 /**
@@ -74,7 +78,7 @@ fun MyReservationsScreen(
     val failure = state.failure
     when {
         state.loading -> LoadingContent()
-        failure != null && state.active == null && state.history.isEmpty() ->
+        failure != null && state.active == null && state.history.isEmpty() && state.savedStays.isEmpty() ->
             ErrorContent(failure, onRetry = vm::dismissError)
         else -> Column(
             modifier = Modifier
@@ -140,6 +144,12 @@ fun MyReservationsScreen(
                 state.history.forEach { card ->
                     ReservationRow(card = card, highlighted = card.reservation.id == reservationId)
                 }
+            }
+
+            if (state.savedStays.isNotEmpty()) {
+                OfflineBanner()
+                Text(stringResource(R.string.my_reservations_saved_stays), style = MaterialTheme.typography.titleSmall)
+                state.savedStays.forEach { StayRow(it) }
             }
 
             state.rejection?.let { Problem(it.message(), vm::dismissError) }
@@ -245,6 +255,11 @@ private fun Header(card: ReservationCard, highlighted: Boolean) {
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+    val stayMinutes = reservation.stayMinutes
+    val amount = reservation.amount
+    if (reservation.status == ReservationStatus.FINISHED && stayMinutes != null && amount != null) {
+        StayLine(stayMinutes, amount)
+    }
     if (highlighted) {
         Text(
             stringResource(R.string.my_reservations_highlighted),
@@ -307,4 +322,40 @@ private fun Problem(message: String, onDismiss: () -> Unit) {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.my_reservations_dismiss)) }
         }
     }
+}
+
+/** Una estadía del historial guardado en el teléfono, para verla sin conexión (T19). */
+@Composable
+private fun StayRow(stay: Stay) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stay.parkingLotName, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                ReservationStatusBadge(ReservationStatus.FINISHED)
+            }
+            Text(
+                stringResource(R.string.my_reservations_stay_spot, stay.spotCode, formatDateAndTime(stay.arrivesAt)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            StayLine(stay.stayMinutes, stay.amount)
+        }
+    }
+}
+
+/** "Estadía de 1 h 05 min · $2.708". El importe es informativo: la app no cobra. */
+@Composable
+private fun StayLine(stayMinutes: Int, amount: Int) {
+    Text(
+        stringResource(
+            R.string.my_reservations_stay_summary,
+            formatDuration(Duration.ofMinutes(stayMinutes.toLong())),
+            formatAmount(amount),
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+    )
 }
