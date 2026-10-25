@@ -14,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
@@ -39,7 +40,8 @@ class ParkingLotRepositoryFirebaseTest {
     fun listaLosEstacionamientosDeLaSemilla() = runBlocking<Unit> {
         val lots = success(repository.parkingLots().first())
 
-        assertEquals(listOf("abasto", "parque-centenario", "utn-medrano"), lots.map { it.id }.sorted())
+        // Los de la semilla, sin contar los que arman otros tests o el panel del administrador.
+        assertTrue(lots.map { it.id }.containsAll(listOf("abasto", "parque-centenario", "utn-medrano")))
         assertEquals(14, lots.first { it.id == "utn-medrano" }.capacity)
     }
 
