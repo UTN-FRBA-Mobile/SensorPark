@@ -60,6 +60,34 @@ class AdminDraftsTest {
     }
 
     @Test
+    fun `la ocupacion por hora cuenta las franjas que tocan cada hora`() {
+        val zone = java.time.ZoneId.of("America/Argentina/Buenos_Aires")
+        val day = java.time.LocalDate.of(2026, 10, 25)
+        fun at(hour: Int, minute: Int = 0) = day.atTime(hour, minute).atZone(zone).toInstant()
+        fun reservation(id: String, from: Instant, until: Instant, status: ReservationStatus, checkedOut: Instant? = null) =
+            Reservation(id, "ana", "lot", "01", "01", SpotType.STANDARD, from, 60, until, from, status, checkedOutAt = checkedOut)
+
+        val hours = hourlyOccupancy(
+            listOf(
+                // De 10:30 a 12:00: toca las 10 y las 11.
+                reservation("a", at(10, 30), at(12), ReservationStatus.FINISHED),
+                // Reservó de 11 a 13 pero se fue a las 11:20: sólo cuenta las 11.
+                reservation("b", at(11), at(13), ReservationStatus.FINISHED, checkedOut = at(11, 20)),
+                reservation("c", at(11), at(12), ReservationStatus.CANCELLED),
+                reservation("d", at(11), at(12), ReservationStatus.EXPIRED),
+            ),
+            day,
+            zone,
+        )
+
+        assertEquals(24, hours.size)
+        assertEquals(1, hours[10])
+        assertEquals(2, hours[11])
+        assertEquals(0, hours[12])
+        assertEquals(3, hours.sum())
+    }
+
+    @Test
     fun `el resumen del dia cuenta lugares y reservas`() {
         val spots = listOf(
             Spot("01", "01", SpotType.STANDARD, SpotStatus.FREE),

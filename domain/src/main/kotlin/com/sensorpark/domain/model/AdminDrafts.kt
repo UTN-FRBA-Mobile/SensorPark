@@ -1,6 +1,8 @@
 package com.sensorpark.domain.model
 
+import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 
 // Lo que carga el administrador de estacionamiento en su panel (T22), antes de guardarlo. Las
 // validaciones viven acá, sin Android, para mostrarlas en el momento y probarlas sin emulador.
@@ -114,5 +116,21 @@ data class DaySummary(
             cancelled = today.count { it.status == ReservationStatus.CANCELLED },
             expired = today.count { it.status == ReservationStatus.EXPIRED },
         )
+    }
+}
+
+/**
+ * Ocupación por hora de un día (T22): para cada hora de 0 a 23, cuántas reservas la cubren al
+ * menos en parte. Las canceladas y las vencidas no cuentan: esos lugares no se usaron.
+ */
+fun hourlyOccupancy(reservations: List<Reservation>, day: LocalDate, zone: ZoneId): List<Int> {
+    val start = day.atStartOfDay(zone)
+    return (0 until 24).map { hour ->
+        val from = start.plusHours(hour.toLong()).toInstant()
+        val until = start.plusHours(hour + 1L).toInstant()
+        reservations.count {
+            it.status != ReservationStatus.CANCELLED && it.status != ReservationStatus.EXPIRED &&
+                it.arrivesAt < until && (it.checkedOutAt ?: it.endsAt) > from
+        }
     }
 }

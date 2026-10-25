@@ -13,6 +13,7 @@ import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.model.SpotAvailability
 import com.sensorpark.domain.model.SpotDraft
 import com.sensorpark.domain.model.SpotStatus
+import com.sensorpark.domain.model.hourlyOccupancy
 import com.sensorpark.domain.repository.ParkingLotAdminRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
 import com.sensorpark.domain.repository.SpotAvailabilityRepository
@@ -90,6 +91,11 @@ class ParkingLotPanelViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DaySummary.of(emptyList(), emptyList()))
 
     val todayReservations: StateFlow<List<Reservation>> = today
+
+    /** Cuántas reservas cubren cada hora de hoy, de 0 a 23: el gráfico de la solapa Hoy. */
+    val hourly: StateFlow<List<Int>> = today
+        .map { hourlyOccupancy(it, clock.instant().atZone(ReservationRules.ZONE).toLocalDate(), ReservationRules.ZONE) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), List(24) { 0 })
 
     private val _action = MutableStateFlow(SpotAction())
     val action: StateFlow<SpotAction> = _action.asStateFlow()
