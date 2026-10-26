@@ -77,17 +77,18 @@ import java.time.ZoneOffset
 fun ReserveScreen(
     parkingLotId: String,
     onOpenMyReservations: () -> Unit,
-    spotId: String? = null,
     vm: ReserveViewModel = hiltViewModel(),
+    /** El lugar que se tocó en el plano del estacionamiento, si se llegó desde ahí. */
+    spot: PickedSpot? = null,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
-    LaunchedEffect(parkingLotId, spotId) { vm.load(parkingLotId, spotId) }
+    LaunchedEffect(parkingLotId, spot) { vm.load(parkingLotId, spot) }
 
     val confirmation = state.confirmation
     val failure = state.failure
     when {
         state.loading -> LoadingContent()
-        state.parkingLot == null && failure != null -> ErrorContent(failure, onRetry = { vm.load(parkingLotId, spotId) })
+        state.parkingLot == null && failure != null -> ErrorContent(failure, onRetry = { vm.load(parkingLotId, spot) })
         confirmation != null -> Confirmation(state, confirmation, onOpenMyReservations)
         else -> Form(state, vm, onOpenMyReservations)
     }
@@ -181,29 +182,32 @@ private fun Form(state: ReserveState, vm: ReserveViewModel, onOpenMyReservations
             color = MaterialTheme.colorScheme.primary,
         )
 
-        Text(
-            text = stringResource(R.string.reserve_spot_type),
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-        )
-        state.spot?.let { spot ->
+        val picked = state.picked
+        if (picked != null) {
+            // Llegó desde el plano con un lugar elegido: se reserva ese, no un tipo.
             Text(
-                text = stringResource(R.string.reserve_picked_spot, spot.code, spot.type.label()),
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.primary,
+                text = stringResource(R.string.reserve_picked_spot),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
             )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = stringResource(R.string.reserve_picked_spot_value, picked.code, picked.type.label()),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                )
+                TextButton(onClick = vm::clearPickedSpot) { Text(stringResource(R.string.reserve_change_spot)) }
+            }
+        } else {
             Text(
-                text = stringResource(R.string.reserve_picked_spot_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = stringResource(R.string.reserve_spot_type),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            )
+            Chips(
+                options = state.spotTypes,
+                selected = state.form.spotType,
+                label = { it.label() },
+                onSelect = vm::setSpotType,
             )
         }
-        // Con un lugar puntual elegido no hay chip marcado: tocar uno pasa a pedir ese tipo.
-        Chips(
-            options = state.spotTypes,
-            selected = if (state.spot == null) state.form.spotType else null,
-            label = { it.label() },
-            onSelect = vm::setSpotType,
-        )
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -373,7 +377,7 @@ private fun Confirmation(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun <T> Chips(options: List<T>, selected: T?, label: @Composable (T) -> String, onSelect: (T) -> Unit) {
+private fun <T> Chips(options: List<T>, selected: T, label: @Composable (T) -> String, onSelect: (T) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { option ->
             FilterChip(

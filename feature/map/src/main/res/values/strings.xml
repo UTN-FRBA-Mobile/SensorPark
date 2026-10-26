@@ -1,29 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="nearby_title">Estacionamientos cercanos</string>
-    <string name="nearby_subtitle">A menos de %1$s de %2$s</string>
-    <string name="nearby_subtitle_user">A menos de %1$s de vos</string>
-    <string name="nearby_this_area">esta zona</string>
+    <string name="nearby_subtitle_device">A menos de %1$s de tu ubicación</string>
+    <string name="nearby_subtitle_default">A menos de %1$s de %2$s</string>
+    <string name="nearby_subtitle_area">A menos de %1$s de la zona que elegiste en el mapa</string>
     <string name="nearby_empty">No hay estacionamientos con esos filtros.</string>
     <string name="nearby_filter_free">Con lugares libres</string>
     <string name="nearby_filter_favorites">Favoritos</string>
     <string name="nearby_free_of_type">%1$s: %2$d de %3$d libres</string>
-    <string name="nearby_mode_map">Mapa</string>
-    <string name="nearby_mode_list">Lista</string>
+    <string name="nearby_view_map">Mapa</string>
+    <string name="nearby_view_list">Lista</string>
     <string name="nearby_search_here">Buscar en esta zona</string>
-    <string name="nearby_open_detail">Ver lugares</string>
-    <string name="nearby_directions">Cómo llegar</string>
-    <string name="nearby_marker_free">%1$d libres</string>
-    <string name="nearby_marker_full">Completo</string>
-    <string name="nearby_marker_description">%1$s: %2$d lugares libres</string>
-
-    <!-- Permiso de ubicación, pedido en contexto -->
-    <string name="location_rationale_title">Para mostrarte lo que tenés cerca</string>
-    <string name="location_rationale_body">Usamos tu ubicación para mostrarte estacionamientos cercanos. La leemos sólo cuando abrís esta pestaña.</string>
-    <string name="location_allow">Permitir</string>
-    <string name="location_not_now">Ahora no</string>
-    <string name="location_denied">Sin tu ubicación te mostramos la zona de %1$s. Mové el mapa y tocá Buscar en esta zona.</string>
-    <string name="location_denied_forever">Sin tu ubicación te mostramos la zona de %1$s. Negaste el permiso para siempre: lo podés dar desde los ajustes del teléfono.</string>
-    <string name="location_ask_again">Usar mi ubicación</string>
-    <string name="location_open_settings">Abrir ajustes</string>
+    <string name="nearby_my_location">Ir a mi ubicación</string>
+    <string name="nearby_open_detail">Ver detalle</string>
+    <string name="nearby_permission_rationale">Usamos tu ubicación para mostrarte estacionamientos cercanos. Mientras tanto, te mostramos los de una zona por defecto.</string>
+    <string name="nearby_permission_allow">Permitir ubicación</string>
+    <string name="nearby_permission_settings">Para ver los estacionamientos cercanos a vos, activá la ubicación en los ajustes de la app. Mientras tanto, mové el mapa y buscá en la zona que quieras.</string>
+    <string name="nearby_permission_open_settings">Abrir ajustes</string>
+    <string name="nearby_location_failed">No pudimos leer tu ubicación. Revisá que el GPS esté encendido.</string>
+    <string name="nearby_location_retry">Reintentar</string>
+    <string name="nearby_locating">Buscando tu ubicación…</string>
 </resources>

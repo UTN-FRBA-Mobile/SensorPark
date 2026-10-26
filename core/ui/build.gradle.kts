@@ -33,4 +33,5 @@ dependencies {
     api(libs.material.icons.extended)
 
     debugImplementation(libs.ui.tooling)
+    testImplementation(libs.junit)
 }

@@ -51,6 +51,7 @@ import com.sensorpark.app.ui.login.LoginScreen
 import com.sensorpark.app.ui.login.SignUpScreen
 import com.sensorpark.domain.model.Role
 import com.sensorpark.domain.model.SessionState
+import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.navigation.DeepLinks
 import com.sensorpark.feature.admin.CreateParkingLotScreen
 import com.sensorpark.feature.admin.ManagedParkingLotsScreen
@@ -59,6 +60,7 @@ import com.sensorpark.feature.checkin.CheckInScreen
 import com.sensorpark.feature.map.MapScreen
 import com.sensorpark.feature.parking.ParkingLotDetailScreen
 import com.sensorpark.feature.reservations.MyReservationsScreen
+import com.sensorpark.feature.reservations.PickedSpot
 import com.sensorpark.feature.reservations.ReserveScreen
 import com.sensorpark.feature.reservations.WaitlistOfferScreen
 
@@ -233,21 +235,25 @@ private fun NavGraphBuilder.searchTab(nav: NavHostController) {
             ParkingLotDetailScreen(
                 parkingLotId = entry.arguments?.getString(Route.ARG_PARKING_LOT_ID).orEmpty(),
                 onReserve = { nav.navigate(Route.Reserve.create(it)) },
-                onReserveSpot = { lotId, spotId -> nav.navigate(Route.Reserve.create(lotId, spotId)) },
+                onReserveSpot = { parkingLotId, spot -> nav.navigate(Route.Reserve.create(parkingLotId, spot)) },
             )
         }
         composable(
             route = Route.Reserve.pattern,
-            arguments = listOf(
-                navArgument(Route.ARG_SPOT_ID) {
+            arguments = listOf(Route.ARG_SPOT_ID, Route.ARG_SPOT_CODE, Route.ARG_SPOT_TYPE).map {
+                navArgument(it) {
                     type = NavType.StringType
                     nullable = true
-                },
-            ),
+                }
+            },
         ) { entry ->
+            val args = entry.arguments
+            val spotType = SpotType.from(args?.getString(Route.ARG_SPOT_TYPE))
+            val spotId = args?.getString(Route.ARG_SPOT_ID)
+            val spotCode = args?.getString(Route.ARG_SPOT_CODE)
             ReserveScreen(
-                parkingLotId = entry.arguments?.getString(Route.ARG_PARKING_LOT_ID).orEmpty(),
-                spotId = entry.arguments?.getString(Route.ARG_SPOT_ID),
+                parkingLotId = args?.getString(Route.ARG_PARKING_LOT_ID).orEmpty(),
+                spot = if (spotId != null && spotCode != null && spotType != null) PickedSpot(spotId, spotCode, spotType) else null,
                 // A la lista, donde está la reserva nueva: no a la pantalla que había quedado
                 // abierta en esa pestaña (por ejemplo el resumen de una reserva anterior).
                 onOpenMyReservations = { nav.openTabAtStart(Tab.RESERVATIONS) },

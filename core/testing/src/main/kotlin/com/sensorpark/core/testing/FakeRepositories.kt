@@ -328,30 +328,28 @@ class FakeLocationRepository(
     var reading: LocationReading? = LocationReading(Samples.UTN_MEDRANO.location, accuracyMeters = 8f),
     private var permission: Boolean = true,
 ) : LocationRepository {
-    /** Cuántas veces se pidió la ubicación, para comprobar que no se pide de más. */
-    var requests = 0
-        private set
-
-    override suspend fun currentLocation(): LocationReading? {
-        requests++
-        return reading
-    }
-
-    override suspend fun approximateLocation(): LocationReading? {
-        requests++
-        return reading
-    }
+    override suspend fun currentLocation(): LocationReading? = reading
 
     override fun hasLocationPermission(): Boolean = permission
+
+    /** Lecturas aproximadas pedidas, para probar que la búsqueda no pide de más. */
+    var approximateCalls = 0
+        private set
+
+    override suspend fun approximateLocation(): LocationReading? {
+        approximateCalls++
+        return if (permission) reading else null
+    }
+
+    override fun hasApproximatePermission(): Boolean = permission
+
+    fun grantPermission() {
+        permission = true
+    }
 
     fun denyPermission() {
         permission = false
         reading = null
-    }
-
-    fun grantPermission(at: LocationReading = LocationReading(Samples.UTN_MEDRANO.location, accuracyMeters = 8f)) {
-        permission = true
-        reading = at
     }
 
     /** A un par de kilómetros: el check-in se rechaza por TOO_FAR. */
