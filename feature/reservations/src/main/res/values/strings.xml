@@ -7,8 +7,9 @@
     <string name="reserve_duration">¿Cuánto te quedás?</string>
     <string name="reserve_slot">De %1$s a %2$s</string>
     <string name="reserve_spot_type">Tipo de lugar</string>
-    <string name="reserve_picked_spot">Lugar %1$s · %2$s</string>
-    <string name="reserve_picked_spot_hint">El que elegiste en el plano. Para que te asignemos cualquiera, elegí un tipo de lugar.</string>
+    <string name="reserve_picked_spot">Lugar elegido</string>
+    <string name="reserve_picked_spot_value">Lugar %1$s · %2$s</string>
+    <string name="reserve_change_spot">Elegir por tipo</string>
     <string name="reserve_free_now_hint">Libres ahora de ese tipo. La disponibilidad de tu franja la confirma el servidor al reservar.</string>
     <string name="reserve_estimated_amount">Tarifa estimada: %1$s</string>
     <string name="reserve_confirm">Confirmar reserva</string>

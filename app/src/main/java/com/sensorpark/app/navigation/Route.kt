@@ -1,5 +1,7 @@
 package com.sensorpark.app.navigation
 
+import android.net.Uri
+import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.navigation.DeepLinks
 
 /** Una ruta por pantalla. `pattern` es lo que registra el NavHost; `create` arma la ruta con sus datos. */
@@ -14,10 +16,14 @@ sealed class Route(val pattern: String) {
         fun create(parkingLotId: String) = "parking-lot/$parkingLotId"
     }
 
-    /** Con `spotId`, reserva ese lugar puntual, el que se tocó en el plano (T12). */
-    data object Reserve : Route("reserve/{$ARG_PARKING_LOT_ID}?$ARG_SPOT_ID={$ARG_SPOT_ID}") {
-        fun create(parkingLotId: String, spotId: String? = null) =
-            if (spotId == null) "reserve/$parkingLotId" else "reserve/$parkingLotId?$ARG_SPOT_ID=$spotId"
+    /** Con un lugar del plano (T12) la ruta suma su id, su código y su tipo. */
+    data object Reserve :
+        Route("reserve/{$ARG_PARKING_LOT_ID}?$ARG_SPOT_ID={$ARG_SPOT_ID}&$ARG_SPOT_CODE={$ARG_SPOT_CODE}&$ARG_SPOT_TYPE={$ARG_SPOT_TYPE}") {
+        fun create(parkingLotId: String, spot: Spot? = null): String {
+            val base = "reserve/$parkingLotId"
+            if (spot == null) return base
+            return "$base?$ARG_SPOT_ID=${Uri.encode(spot.id)}&$ARG_SPOT_CODE=${Uri.encode(spot.code)}&$ARG_SPOT_TYPE=${spot.type.name}"
+        }
     }
 
     /** Destino del deep link `sensorpark://reservation/{id}`; sin id muestra la lista completa. */
@@ -49,5 +55,7 @@ sealed class Route(val pattern: String) {
     companion object {
         const val ARG_PARKING_LOT_ID = "parkingLotId"
         const val ARG_SPOT_ID = "spotId"
+        const val ARG_SPOT_CODE = "spotCode"
+        const val ARG_SPOT_TYPE = "spotType"
     }
 }
