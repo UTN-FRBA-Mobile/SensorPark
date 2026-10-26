@@ -33,7 +33,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.text.font.FontWeight
 import com.sensorpark.core.ui.R
+import com.sensorpark.core.ui.theme.SensorParkColors
 import com.sensorpark.core.ui.theme.SensorParkTheme
+import com.sensorpark.core.ui.theme.StatusColor
 import com.sensorpark.domain.model.DataErrorReason
 import com.sensorpark.domain.model.SpotType
 import java.util.Locale
@@ -66,15 +68,17 @@ fun formatDistance(meters: Double): String =
     if (meters < 1_000) "${meters.roundToInt()} m"
     else String.format(Locale.forLanguageTag("es-AR"), "%.1f km", meters / 1_000)
 
-/** Pastilla con los lugares libres: verde si hay, ámbar si queda un cuarto o menos, rojo si está completo. */
+/** El color de la disponibilidad: verde si hay, ámbar si queda un cuarto o menos, rojo si está completo. */
+fun availabilityColor(free: Int, capacity: Int, colors: SensorParkColors): StatusColor = when {
+    free <= 0 -> colors.negative
+    free * 4 <= capacity -> colors.warning
+    else -> colors.positive
+}
+
+/** Pastilla con los lugares libres, del color de [availabilityColor]. */
 @Composable
 fun AvailabilityBadge(free: Int, capacity: Int, modifier: Modifier = Modifier) {
-    val colors = SensorParkTheme.colors
-    val status = when {
-        free <= 0 -> colors.negative
-        free * 4 <= capacity -> colors.warning
-        else -> colors.positive
-    }
+    val status = availabilityColor(free, capacity, SensorParkTheme.colors)
     Surface(
         color = status.container,
         contentColor = status.content,

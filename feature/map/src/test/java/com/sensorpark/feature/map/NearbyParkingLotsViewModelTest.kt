@@ -7,47 +7,37 @@ import com.sensorpark.core.testing.Samples
 import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.DataResult
 import com.sensorpark.domain.model.LocationReading
-import com.sensorpark.domain.model.NearbyParkingLot
+import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.model.SpotType
-import com.sensorpark.domain.usecase.SearchNearbyParkingLotsUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class NearbyParkingLotsViewModelTest {
-
-    /** Tres estacionamientos: uno en Medrano, uno a ~1 km y uno lejos, en Belgrano. */
+    // Tres estacionamientos sobre la misma avenida: a unos 0, 1,2 y 4,5 km de UTN Medrano.
+    private val medrano = Samples.UTN_MEDRANO.copy(id = "medrano", name = "UTN Medrano", location = Coordinates(-34.5984, -58.4200))
     private val abasto = Samples.UTN_MEDRANO.copy(
-        id = "abasto",
-        name = "Playa Abasto",
-        location = Coordinates(-34.6037, -58.4110),
-        freeSpots = 0,
-        freeSpotsByType = mapOf(SpotType.STANDARD to 0),
+        id = "abasto", name = "Playa Abasto", location = Coordinates(-34.6037, -58.4108), freeSpots = 0,
     )
-    private val belgrano = Samples.UTN_MEDRANO.copy(
-        id = "belgrano",
-        name = "Playa Belgrano",
-        location = Coordinates(-34.5627, -58.4563),
-    )
-    private val favorites = FakeFavoritesRepository()
-    private val parkingLots = FakeParkingLotRepository(listOf(Samples.UTN_MEDRANO, abasto, belgrano))
+    private val lejos = Samples.UTN_MEDRANO.copy(id = "lejos", name = "Lejos", location = Coordinates(-34.6400, -58.3500))
+    private val lots = listOf(lejos, abasto, medrano)
 
-    /** Una ubicación en Belgrano, lejos de la zona por defecto. */
-    private val inBelgrano = LocationReading(Coordinates(-34.5630, -58.4560), accuracyMeters = 30f)
+    private val parkingLots = FakeParkingLotRepository(lots)
+    private val favorites = FakeFavoritesRepository()
 
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -55,168 +45,171 @@ class NearbyParkingLotsViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun TestScope.collecting(vm: NearbyParkingLotsViewModel) {
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.result.collect() }
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.selected.collect() }
-    }
+    private fun viewModel(location: FakeLocationRepository = FakeLocationRepository()) =
+        NearbyParkingLotsViewModel(parkingLots, location, favorites, UnconfinedTestDispatcher())
 
-    private fun viewModel(location: FakeLocationRepository) =
-        NearbyParkingLotsViewModel(SearchNearbyParkingLotsUseCase(parkingLots), location, favorites)
+    /** Como la pantalla: recolecta el resultado desde el principio. */
+    private fun TestScope.collecting(vm: NearbyParkingLotsViewModel): Job =
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.result.collect {} }
 
     private fun NearbyParkingLotsViewModel.ids(): List<String> =
-        (result.value as DataResult.Success<List<NearbyParkingLot>>).value.map { it.parkingLot.id }
+        (result.value as DataResult.Success).value.map { it.parkingLot.id }
 
     @Test
-    fun conElPermisoYaDadoBuscaDesdeLaUbicacionDelTelefono() = runTest {
-        val location = FakeLocationRepository(reading = inBelgrano)
-        val vm = viewModel(location)
+    fun conPermisoBuscaDesdeLaUbicacionDelTelefonoYOrdenaPorDistancia() = runTest {
+        val phone = FakeLocationRepository(LocationReading(Coordinates(-34.6037, -58.4108), accuracyMeters = 20f))
+        val vm = viewModel(phone)
         collecting(vm)
+        advanceTimeBy(1)
 
+        assertEquals(OriginSource.DEVICE, vm.origin.value.source)
+        assertEquals(Coordinates(-34.6037, -58.4108), vm.origin.value.coordinates)
+        assertEquals(listOf("abasto", "medrano"), vm.ids())
         assertEquals(LocationAccess.GRANTED, vm.access.value)
-        assertTrue(vm.origin.value.fromUser)
-        assertEquals(inBelgrano.coordinates, vm.origin.value.coordinates)
-        assertEquals(listOf("belgrano"), vm.ids())
     }
 
     @Test
-    fun sinPermisoTodaviaBuscaDesdeLaZonaPorDefectoYNoPideUbicacion() = runTest {
-        val location = FakeLocationRepository(permission = false, reading = null)
-        val vm = viewModel(location)
+    fun sinPermisoNoQuedaEnBlancoYBuscaEnLaZonaPorDefecto() = runTest {
+        val phone = FakeLocationRepository().also { it.denyPermission() }
+        val vm = viewModel(phone)
         collecting(vm)
 
+        assertEquals(OriginSource.DEFAULT_ZONE, vm.origin.value.source)
         assertEquals(LocationAccess.UNKNOWN, vm.access.value)
-        assertFalse(vm.origin.value.fromUser)
-        assertEquals(NearbyParkingLotsViewModel.DEFAULT_ORIGIN, vm.origin.value.coordinates)
-        assertEquals(0, location.requests)
-        // Medrano y Abasto están a menos de 2 km de la zona por defecto; Belgrano no.
-        assertEquals(listOf("utn-medrano", "abasto"), vm.ids())
+        assertEquals(listOf("medrano", "abasto"), vm.ids())
+        assertEquals(0, phone.approximateCalls)
     }
 
     @Test
-    fun alDarElPermisoBuscaDesdeLaUbicacion() = runTest {
-        val location = FakeLocationRepository(permission = false, reading = null)
-        val vm = viewModel(location)
+    fun alRechazarElPermisoSeQuedaEnLaZonaPorDefecto() = runTest {
+        val phone = FakeLocationRepository().also { it.denyPermission() }
+        val vm = viewModel(phone)
         collecting(vm)
 
-        location.grantPermission(at = inBelgrano)
-        vm.onPermissionResult(granted = true, canAskAgain = true)
-
-        assertEquals(LocationAccess.GRANTED, vm.access.value)
-        assertEquals(listOf("belgrano"), vm.ids())
-    }
-
-    @Test
-    fun alNegarloSeQuedaEnLaZonaPorDefectoYSePuedeVolverAPedir() = runTest {
-        val location = FakeLocationRepository(permission = false, reading = null)
-        val vm = viewModel(location)
-        collecting(vm)
-
-        vm.onPermissionResult(granted = false, canAskAgain = true)
+        vm.onPermissionResult(granted = false)
 
         assertEquals(LocationAccess.DENIED, vm.access.value)
-        assertFalse(vm.origin.value.fromUser)
-        assertEquals(listOf("utn-medrano", "abasto"), vm.ids())
+        assertEquals(OriginSource.DEFAULT_ZONE, vm.origin.value.source)
     }
 
     @Test
-    fun alNegarloParaSiempreLoDistingue() = runTest {
-        val vm = viewModel(FakeLocationRepository(permission = false, reading = null))
+    fun alConcederElPermisoLeeLaUbicacionYBuscaDesdeAhi() = runTest {
+        val phone = FakeLocationRepository(LocationReading(Coordinates(-34.6400, -58.3500), accuracyMeters = 20f))
+            .also { it.denyPermission() }
+        val vm = viewModel(phone)
         collecting(vm)
+        assertEquals(listOf("medrano", "abasto"), vm.ids())
 
-        vm.onPermissionResult(granted = false, canAskAgain = false)
+        phone.grantPermission()
+        phone.reading = LocationReading(Coordinates(-34.6400, -58.3500), accuracyMeters = 20f)
+        vm.onPermissionResult(granted = true)
 
-        assertEquals(LocationAccess.DENIED_FOREVER, vm.access.value)
+        assertEquals(OriginSource.DEVICE, vm.origin.value.source)
+        assertEquals(listOf("lejos"), vm.ids())
     }
 
     @Test
-    fun sinPermisoSePuedeMoverElMapaYBuscarEnOtraZona() = runTest {
-        val vm = viewModel(FakeLocationRepository(permission = false, reading = null))
-        collecting(vm)
-        vm.onPermissionResult(granted = false, canAskAgain = true)
-
-        vm.searchHere(belgrano.location)
-
-        assertEquals(belgrano.location, vm.origin.value.coordinates)
-        assertFalse(vm.origin.value.fromUser)
-        assertEquals(listOf("belgrano"), vm.ids())
-    }
-
-    @Test
-    fun siLaUbicacionNoLlegaSeQuedaDondeEstaba() = runTest {
-        // Con permiso pero con la ubicación del teléfono apagada.
-        val vm = viewModel(FakeLocationRepository(permission = true, reading = null))
+    fun conPermisoPeroSinLecturaAvisaYSigueEnLaZonaPorDefecto() = runTest {
+        val vm = viewModel(FakeLocationRepository(reading = null))
         collecting(vm)
 
-        assertFalse(vm.origin.value.fromUser)
+        assertTrue(vm.locationFailed.value)
         assertFalse(vm.locating.value)
-        assertEquals(listOf("utn-medrano", "abasto"), vm.ids())
+        assertEquals(OriginSource.DEFAULT_ZONE, vm.origin.value.source)
     }
 
     @Test
-    fun losFiltrosCambianLoQueSeMuestra() = runTest {
-        val vm = viewModel(FakeLocationRepository(permission = false, reading = null))
+    fun buscarEnEstaZonaCambiaElOrigenYDeseleccionaElMarcador() = runTest {
+        val vm = viewModel(FakeLocationRepository().also { it.denyPermission() })
         collecting(vm)
+        vm.select("medrano")
+
+        vm.searchHere(Coordinates(-34.6400, -58.3500))
+
+        assertEquals(OriginSource.MAP_AREA, vm.origin.value.source)
+        assertEquals(null, vm.selectedId.value)
+        assertEquals(listOf("lejos"), vm.ids())
+    }
+
+    @Test
+    fun alQuitarElPermisoEnAjustesVuelveALaZonaPorDefecto() = runTest {
+        val phone = FakeLocationRepository(LocationReading(Coordinates(-34.6400, -58.3500), accuracyMeters = 20f))
+        val vm = viewModel(phone)
+        collecting(vm)
+        assertEquals(OriginSource.DEVICE, vm.origin.value.source)
+
+        phone.denyPermission()
+        vm.onResume()
+
+        assertEquals(LocationAccess.DENIED, vm.access.value)
+        assertEquals(OriginSource.DEFAULT_ZONE, vm.origin.value.source)
+    }
+
+    @Test
+    fun losFiltrosCambianLaListaSinVolverALeerLosEstacionamientos() = runTest {
+        val vm = viewModel()
+        collecting(vm)
+        assertEquals(listOf("medrano", "abasto"), vm.ids())
 
         vm.toggleOnlyWithFreeSpots()
-
-        // Abasto está completo.
-        assertEquals(listOf("utn-medrano"), vm.ids())
-    }
-
-    @Test
-    fun tocarUnMarcadorLoSeleccionaYUnFiltroQueLoSacaLoDeselecciona() = runTest {
-        val vm = viewModel(FakeLocationRepository(permission = false, reading = null))
-        collecting(vm)
-
-        vm.select("abasto")
-        assertEquals("abasto", vm.selected.value?.parkingLot?.id)
+        assertEquals(listOf("medrano"), vm.ids())
 
         vm.toggleOnlyWithFreeSpots()
-        assertNull(vm.selected.value)
+        vm.selectSpotType(SpotType.MOTORCYCLE)
+        assertEquals(listOf("medrano", "abasto"), vm.ids())
+
+        // Elegir el mismo tipo de nuevo lo saca.
+        vm.selectSpotType(SpotType.MOTORCYCLE)
+        assertEquals(null, vm.filter.value.spotType)
     }
 
     @Test
-    fun elFiltroFavoritosMuestraSoloLosGuardadosAunqueQuedenLejos() = runTest {
-        val vm = viewModel(FakeLocationRepository(permission = false, reading = null))
+    fun soloFavoritosMuestraLosElegidosAunqueEstenLejos() = runTest {
+        favorites.setFavorite("lejos", true)
+        val vm = viewModel()
+        collecting(vm)
+        collectFavorites(vm)
+
+        vm.toggleFavoritesOnly()
+
+        assertEquals(listOf("lejos"), vm.ids())
+        assertTrue(vm.favoritesOnly.value)
+    }
+
+    @Test
+    fun tocarElCorazonMarcaYDesmarcaElFavorito() = runTest {
+        val vm = viewModel()
+        collectFavorites(vm)
+
+        vm.toggleFavorite("abasto")
+        assertEquals(setOf("abasto"), favorites.current)
+
+        vm.toggleFavorite("abasto")
+        assertEquals(emptySet<String>(), favorites.current)
+    }
+
+    @Test
+    fun unCambioDeLosContadoresActualizaElResultado() = runTest {
+        val vm = viewModel()
         collecting(vm)
 
-        vm.toggleFavorite("belgrano")
-        vm.toggleFavorite("abasto")
-        assertEquals(setOf("belgrano", "abasto"), favorites.current)
+        parkingLots.emit(listOf(medrano.copy(freeSpots = 3), abasto, lejos))
 
-        vm.toggleOnlyFavorites()
-        // Belgrano está fuera del radio desde Medrano, pero es favorito: se muestra igual.
-        assertEquals(listOf("abasto", "belgrano"), vm.ids())
-
-        vm.toggleFavorite("abasto")
-        assertEquals(listOf("belgrano"), vm.ids())
-
-        vm.toggleOnlyFavorites()
-        assertEquals(listOf("utn-medrano", "abasto"), vm.ids())
+        val first = (vm.result.value as DataResult.Success).value.first()
+        assertEquals(3, first.parkingLot.freeSpots)
     }
 
     @Test
-    fun seAlternaEntreMapaYLista() = runTest {
-        val vm = viewModel(FakeLocationRepository(permission = false, reading = null))
+    fun cambiarDeVistaGuardaElModo() = runTest {
+        val vm = viewModel()
+        assertEquals(ViewMode.MAP, vm.viewMode.value)
 
-        assertEquals(ViewMode.MAP, vm.mode.value)
-        vm.toggleMode()
-        assertEquals(ViewMode.LIST, vm.mode.value)
-        vm.toggleMode()
-        assertEquals(ViewMode.MAP, vm.mode.value)
+        vm.setViewMode(ViewMode.LIST)
+
+        assertEquals(ViewMode.LIST, vm.viewMode.value)
     }
 
-    @Test
-    fun comoLlegarArmaElLinkConPuntoDecimalAunqueElTelefonoEsteEnEspanol() {
-        val previous = java.util.Locale.getDefault()
-        java.util.Locale.setDefault(java.util.Locale.forLanguageTag("es-AR"))
-        try {
-            assertEquals(
-                "https://www.google.com/maps/dir/?api=1&destination=-34.598400,-58.420000&travelmode=driving",
-                directionsUrl(Samples.UTN_MEDRANO.location),
-            )
-        } finally {
-            java.util.Locale.setDefault(previous)
-        }
+    private fun TestScope.collectFavorites(vm: NearbyParkingLotsViewModel) {
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.favoriteIds.collect {} }
     }
 }
