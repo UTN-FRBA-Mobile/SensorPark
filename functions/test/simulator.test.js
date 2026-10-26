@@ -220,15 +220,25 @@ describe("runSimulation", () => {
     }
   });
 
-  test("con intervalo largo hace a lo sumo dos ticks y no se pasa del minuto", async () => {
-    const db = fakeDb({ paused: false, intervalSeconds: 60 }, lots(["a"]));
+  // Corre una ejecución con reloj falso y devuelve cuántos ticks hizo y cuánto "tiempo" pasó.
+  async function runWithSeed(seed) {
+    const db = fakeDb({ paused: false, intervalSeconds: 60, seed }, lots(["a"]));
     let clock = 0;
-    const result = await runSimulation(db, { now: () => clock, sleep: async (ms) => { clock += ms; }, log: silentLog });
-    // La espera entre ticks varía entre la mitad y una vez y media del intervalo, a propósito. Con
-    // 60 s entra una segunda pasada cuando la espera sale por debajo del presupuesto (55 s), y eso
-    // pasa cerca del 40 % de las veces; una tercera nunca, porque cada espera dura al menos 30 s.
-    // Antes este test pedía exactamente un tick y fallaba al azar.
-    assert.ok(result.ticks >= 1 && result.ticks <= 2, `hizo ${result.ticks} ticks`);
-    assert.ok(clock <= RUN_BUDGET_MS, "termina antes de que arranque la siguiente corrida");
+    const { ticks } = await runSimulation(db, { now: () => clock, sleep: async (ms) => { clock += ms; }, log: silentLog });
+    return { ticks, elapsedMs: clock, writes: db.writes.length };
+  }
+
+  test("con la misma semilla la ejecución es reproducible", async () => {
+    assert.deepEqual(await runWithSeed(7), await runWithSeed(7));
+  });
+
+  test("con intervalo largo nunca pasa de dos ticks ni del minuto, con cualquier semilla", async () => {
+    // La espera varía entre la mitad y una vez y media del intervalo, así que alcanza el presupuesto
+    // de 55 s según la semilla. Se recorren varias en vez de depender del azar de una sola.
+    for (let seed = 1; seed <= 50; seed++) {
+      const { ticks, elapsedMs } = await runWithSeed(seed);
+      assert.ok(ticks >= 1 && ticks <= 2, `semilla ${seed}: ${ticks} ticks`);
+      assert.ok(elapsedMs <= RUN_BUDGET_MS, `semilla ${seed}: pasó ${elapsedMs} ms`);
+    }
   });
 });

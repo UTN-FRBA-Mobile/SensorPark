@@ -11,7 +11,6 @@ android {
 
     defaultConfig {
         minSdk = 26
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -33,26 +32,14 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
-    // El pedido del permiso de ubicación.
-    implementation(libs.activity.compose)
-    implementation(libs.core.ktx)
 
-    // El mapa. La key sale de MAPS_API_KEY en local.properties: sin ella compila igual, pero el
-    // mapa se ve gris.
-    implementation(libs.play.services.maps)
+    // El mapa. La key va en el manifest de app (MAPS_API_KEY de local.properties).
     implementation(libs.maps.compose)
+    implementation(libs.play.services.maps)
 
     debugImplementation(libs.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     // Repositorios falsos y datos de ejemplo (T04).
     testImplementation(project(":core:testing"))
-
-    // Tests de UI: dibujan las pantallas de verdad en un emulador, sin Firebase.
-    androidTestImplementation(project(":core:testing"))
-    androidTestImplementation(platform(libs.compose.bom))
-    androidTestImplementation(libs.ui.test.junit4)
-    androidTestImplementation(libs.androidx.test.runner)
-    androidTestImplementation(libs.androidx.test.junit)
-    debugImplementation(libs.ui.test.manifest)
 }

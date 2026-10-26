@@ -7,7 +7,6 @@ import androidx.compose.ui.test.performScrollTo
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeReservationRepository
 import com.sensorpark.core.testing.FakeStayHistoryRepository
-import com.sensorpark.core.testing.FakeSpotAvailabilityRepository
 import com.sensorpark.core.testing.FakeUserRepository
 import com.sensorpark.core.testing.Samples
 import com.sensorpark.core.ui.theme.SensorParkTheme
@@ -47,7 +46,6 @@ class WaitlistScreensUiTest {
             users = FakeUserRepository(),
             createReservation = CreateReservationUseCase(reservations, clock),
             enterWaitlist = JoinWaitlistUseCase(reservations, clock),
-            spots = FakeSpotAvailabilityRepository(),
             clock = clock,
         )
         compose.setContent {

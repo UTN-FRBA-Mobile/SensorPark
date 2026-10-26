@@ -13,15 +13,13 @@
     <string name="spots_live">En vivo</string>
     <string name="spots_offline">Sin conexión</string>
     <string name="spots_offline_since">Sin conexión · datos de las %1$s</string>
-
-    <string name="spots_map">Plano de lugares</string>
-    <string name="spots_map_hint">Tocá un lugar libre para reservar ese lugar.</string>
-    <string name="spots_loading">Cargando los lugares…</string>
-    <string name="spot_code">Lugar %1$s</string>
-    <string name="spot_tap_to_reserve">Tocá para reservarlo</string>
-    <string name="spot_type_priority">Preferencial</string>
-    <string name="spot_category_pregnant">preferencial para embarazadas</string>
-    <string name="spot_category_pregnant_short">Embarazo</string>
-    <string name="spot_category_reduced_mobility">preferencial para movilidad reducida</string>
-    <string name="spot_category_reduced_mobility_short">Mov. red.</string>
+    <string name="plan_title">Plano de lugares</string>
+    <string name="plan_spot_description">Lugar %1$s, %2$s</string>
+    <string name="plan_reserve_spot">Reservar este lugar</string>
+    <string name="plan_hint">Tocá un lugar libre para reservarlo.</string>
+    <string name="plan_loading">Cargando los lugares…</string>
+    <string name="plan_error">No pudimos cargar los lugares.</string>
+    <string name="plan_empty">Este estacionamiento todavía no tiene lugares cargados.</string>
+    <string name="plan_category_pregnant">Embarazo</string>
+    <string name="plan_category_mobility">Mov. reducida</string>
 </resources>

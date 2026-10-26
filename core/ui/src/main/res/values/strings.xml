@@ -28,6 +28,8 @@
     <string name="parking_card_action_detail">Ver detalle</string>
     <string name="loading">Cargando…</string>
 
+    <string name="directions_action">Cómo llegar</string>
+    <string name="directions_unavailable">No hay ninguna app de mapas para abrir la ruta.</string>
     <string name="offline_banner_message">Sin conexión. Los datos pueden estar desactualizados.</string>
     <string name="offline_banner_last_updated">Última sincronización: %1$s</string>
 
