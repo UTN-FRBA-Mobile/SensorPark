@@ -101,7 +101,6 @@ class DemoFlowTest {
         users = users,
         createReservation = CreateReservationUseCase(reservations, clock),
         enterWaitlist = JoinWaitlistUseCase(reservations, clock),
-        spots = FakeSpotAvailabilityRepository(),
         clock = clock,
     )
 
