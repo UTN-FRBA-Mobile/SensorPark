@@ -10,6 +10,7 @@ import com.sensorpark.domain.notification.ReservationAlertMessages
 import com.sensorpark.domain.repository.GeofenceRepository
 import com.sensorpark.domain.repository.NotificationRepository
 import dagger.hilt.android.AndroidEntryPoint
+import java.time.Clock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,6 +30,8 @@ class GeofenceReceiver : BroadcastReceiver() {
 
     @Inject lateinit var messages: ReservationAlertMessages
 
+    @Inject lateinit var clock: Clock
+
     override fun onReceive(context: Context, intent: Intent) {
         val event = GeofencingEvent.fromIntent(intent) ?: return
         if (event.hasError()) {
@@ -45,6 +48,8 @@ class GeofenceReceiver : BroadcastReceiver() {
             try {
                 reservationIds.forEach { id ->
                     val geofence = geofences.find(id) ?: return@forEach
+                    // Con una reserva para más tarde, pasar por el estacionamiento no es llegar.
+                    if (!geofence.announcesArrival(clock.instant())) return@forEach
                     notifications.notify(messages.arrival(geofence))
                 }
             } catch (e: Exception) {

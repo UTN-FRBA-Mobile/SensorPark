@@ -90,6 +90,12 @@ fun MyReservationsScreen(
         ) {
             Text(stringResource(R.string.my_reservations_title), style = MaterialTheme.typography.headlineMedium)
 
+            // Arriba, junto a las reservas que se cancelan: al final de la lista quedaba fuera de la vista.
+            state.rejection?.let { Problem(it.message(), vm::dismissError) }
+            if (state.active != null || state.history.isNotEmpty()) {
+                failure?.let { Problem(it.message(), vm::dismissError) }
+            }
+
             if (state.isEmpty) {
                 Text(
                     stringResource(R.string.my_reservations_empty),
@@ -150,11 +156,6 @@ fun MyReservationsScreen(
                 OfflineBanner()
                 Text(stringResource(R.string.my_reservations_saved_stays), style = MaterialTheme.typography.titleSmall)
                 state.savedStays.forEach { StayRow(it) }
-            }
-
-            state.rejection?.let { Problem(it.message(), vm::dismissError) }
-            if (state.active != null || state.history.isNotEmpty()) {
-                failure?.let { Problem(it.message(), vm::dismissError) }
             }
         }
     }
