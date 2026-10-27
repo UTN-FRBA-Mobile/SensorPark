@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
+import java.io.IOException
 import javax.inject.Inject
 
 /**
@@ -178,7 +179,16 @@ class ReservationRepositoryFirebase @Inject constructor(
     }
 }
 
-private fun FirebaseFunctionsException.toReason(): DataErrorReason = when (code) {
+/**
+ * Sin red, el SDK de Functions no tira FirebaseNetworkException: tira INTERNAL con la IOException
+ * (por ejemplo UnknownHostException) como causa. También lo usa el panel del administrador.
+ */
+internal fun FirebaseFunctionsException.toReason(): DataErrorReason = when {
+    cause is IOException -> DataErrorReason.NO_CONNECTION
+    else -> codeReason()
+}
+
+private fun FirebaseFunctionsException.codeReason(): DataErrorReason = when (code) {
     Code.NOT_FOUND -> DataErrorReason.NOT_FOUND
     Code.PERMISSION_DENIED, Code.UNAUTHENTICATED -> DataErrorReason.PERMISSION_DENIED
     Code.UNAVAILABLE, Code.DEADLINE_EXCEEDED -> DataErrorReason.NO_CONNECTION

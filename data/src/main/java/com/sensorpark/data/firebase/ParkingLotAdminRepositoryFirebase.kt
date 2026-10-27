@@ -149,11 +149,7 @@ class ParkingLotAdminRepositoryFirebase @Inject constructor(
         val reason = ((e.details as? Map<*, *>)?.get("reason") as? String)?.let { ReservationRejection.from(it) }
         when {
             reason != null -> ReservationOutcome.Rejected(reason)
-            e.code == FirebaseFunctionsException.Code.PERMISSION_DENIED ->
-                ReservationOutcome.Failed(DataErrorReason.PERMISSION_DENIED)
-            e.code == FirebaseFunctionsException.Code.NOT_FOUND -> ReservationOutcome.Failed(DataErrorReason.NOT_FOUND)
-            e.code == FirebaseFunctionsException.Code.UNAVAILABLE -> ReservationOutcome.Failed(DataErrorReason.NO_CONNECTION)
-            else -> ReservationOutcome.Failed(DataErrorReason.UNKNOWN)
+            else -> ReservationOutcome.Failed(e.toReason())
         }
     } catch (e: TimeoutCancellationException) {
         ReservationOutcome.Failed(DataErrorReason.NO_CONNECTION)

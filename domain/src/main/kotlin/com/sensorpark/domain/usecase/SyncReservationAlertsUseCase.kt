@@ -95,6 +95,7 @@ class SyncReservationAlertsUseCase @Inject constructor(
                 center = lot.location,
                 radiusMeters = lot.geofenceRadiusMeters,
                 expiresAt = reservation.toleranceUntil,
+                arrivesAt = reservation.arrivesAt,
             ),
         )
     }

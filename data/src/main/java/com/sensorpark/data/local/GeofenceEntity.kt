@@ -1,5 +1,6 @@
 package com.sensorpark.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -25,6 +26,8 @@ data class GeofenceEntity(
     val longitude: Double,
     val radiusMeters: Int,
     val expiresAtEpochMillis: Long,
+    // Las geocercas guardadas antes de la versión 3 no la tienen: con 0 avisan como antes.
+    @ColumnInfo(defaultValue = "0") val arrivesAtEpochMillis: Long,
 ) {
     fun toDomain() = ActiveGeofence(
         reservationId = reservationId,
@@ -33,6 +36,7 @@ data class GeofenceEntity(
         center = Coordinates(latitude, longitude),
         radiusMeters = radiusMeters,
         expiresAt = Instant.ofEpochMilli(expiresAtEpochMillis),
+        arrivesAt = Instant.ofEpochMilli(arrivesAtEpochMillis),
     )
 
     companion object {
@@ -44,6 +48,7 @@ data class GeofenceEntity(
             longitude = geofence.center.longitude,
             radiusMeters = geofence.radiusMeters,
             expiresAtEpochMillis = geofence.expiresAt.toEpochMilli(),
+            arrivesAtEpochMillis = geofence.arrivesAt.toEpochMilli(),
         )
     }
 }
@@ -63,7 +68,7 @@ interface GeofenceDao {
     suspend fun delete(reservationId: String)
 }
 
-@Database(entities = [GeofenceEntity::class, FavoriteEntity::class, StayEntity::class], version = 2, exportSchema = false)
+@Database(entities = [GeofenceEntity::class, FavoriteEntity::class, StayEntity::class], version = 3, exportSchema = false)
 abstract class SensorParkDatabase : RoomDatabase() {
     abstract fun geofences(): GeofenceDao
 
