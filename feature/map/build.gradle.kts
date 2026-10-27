@@ -11,6 +11,7 @@ android {
 
     defaultConfig {
         minSdk = 26
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -42,4 +43,13 @@ dependencies {
     testImplementation(libs.coroutines.test)
     // Repositorios falsos y datos de ejemplo (T04).
     testImplementation(project(":core:testing"))
+
+    // Tests de UI: dibujan las pantallas de verdad en un emulador, sin Firebase.
+    androidTestImplementation(project(":core:testing"))
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.androidx.test.espresso.core)
+    debugImplementation(libs.ui.test.manifest)
 }
