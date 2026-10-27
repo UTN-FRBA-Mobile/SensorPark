@@ -101,6 +101,20 @@ class CheckInViewModelTest {
     }
 
     @Test
+    fun antesDeLaVentanaDiceDesdeCuandoSePuede() = runTest {
+        // 13:30Z: la llegada es 14:00Z, así que el check-in abre 13:45Z.
+        val world = World(now = Instant.parse("2026-10-18T13:30:00Z"))
+        val vm = world.viewModel()
+        collecting(vm)
+        vm.load(RESERVATION_ID)
+
+        assertTrue(vm.state.value.isTooEarly(world.now))
+        assertFalse(vm.state.value.canCheckIn(world.now))
+        assertEquals(Instant.parse("2026-10-18T13:45:00Z"), vm.state.value.checkInOpensAt)
+        assertFalse(vm.state.value.isTooEarly(Instant.parse("2026-10-18T13:45:00Z")))
+    }
+
+    @Test
     fun pasadaLaToleranciaNoSePuedeHacerCheckIn() = runTest {
         // 14:20Z: la tolerancia terminó 14:15Z.
         val world = World(now = Instant.parse("2026-10-18T14:20:00Z"))
