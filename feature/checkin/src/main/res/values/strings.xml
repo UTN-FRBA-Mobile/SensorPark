@@ -4,6 +4,8 @@
     <string name="check_in_spot">Lugar %1$s</string>
     <string name="check_in_slot">De %1$s a %2$s</string>
     <string name="check_in_tolerance_left">Te quedan %1$s para hacer el check-in</string>
+    <string name="check_in_too_early_today">Todavía es temprano: el check-in se habilita a las %1$s, 15 minutos antes de tu llegada.</string>
+    <string name="check_in_too_early_other_day">Todavía es temprano: el check-in se habilita el %1$s a las %2$s, 15 minutos antes de tu llegada.</string>
     <string name="check_in_tolerance_over">Se pasó la tolerancia: la reserva venció</string>
     <string name="check_in_action">Confirmar que llegué</string>
     <string name="check_in_working">Un momento…</string>

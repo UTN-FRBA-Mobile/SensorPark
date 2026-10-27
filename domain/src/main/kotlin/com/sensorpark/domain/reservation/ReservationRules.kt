@@ -134,6 +134,9 @@ object ReservationRules {
         else -> null
     }
 
+    /** Desde cuándo se puede hacer el check-in de una reserva que llega a [arrivesAt]. */
+    fun checkInOpensAt(arrivesAt: Instant): Instant = arrivesAt.minus(EARLY_CHECK_IN)
+
     fun checkInProblem(
         reservation: Reservation,
         lot: ParkingLot,
@@ -141,7 +144,7 @@ object ReservationRules {
         now: Instant,
     ): ReservationRejection? = when {
         reservation.status != ReservationStatus.CONFIRMED -> ReservationRejection.EXPIRED
-        now < reservation.arrivesAt.minus(EARLY_CHECK_IN) -> ReservationRejection.TOO_EARLY
+        now < checkInOpensAt(reservation.arrivesAt) -> ReservationRejection.TOO_EARLY
         now > reservation.toleranceUntil -> ReservationRejection.EXPIRED
         distanceMeters(location, lot.location) > lot.geofenceRadiusMeters -> ReservationRejection.TOO_FAR
         else -> null

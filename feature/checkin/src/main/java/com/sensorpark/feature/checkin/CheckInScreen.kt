@@ -38,6 +38,7 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 
 private val TIME = DateTimeFormatter.ofPattern("HH:mm").withZone(ReservationRules.ZONE)
+private val DAY = DateTimeFormatter.ofPattern("dd/MM").withZone(ReservationRules.ZONE)
 
 /**
  * Check-in y check-out de una reserva (CU-06 y CU-08). Se abre desde la reserva activa en "Mis
@@ -130,7 +131,17 @@ private fun CheckIn(
     onRequestAnotherSpot: () -> Unit,
 ) {
     val left = state.toleranceLeft(now)
-    if (left.isZero) {
+    val opensAt = state.checkInOpensAt
+    if (opensAt != null && state.isTooEarly(now)) {
+        // Sin esto, el botón aparece gris y "te quedan 11 h" se lee como si ya se pudiera.
+        Text(
+            if (DAY.format(opensAt) == DAY.format(now)) {
+                stringResource(R.string.check_in_too_early_today, TIME.format(opensAt))
+            } else {
+                stringResource(R.string.check_in_too_early_other_day, DAY.format(opensAt), TIME.format(opensAt))
+            },
+        )
+    } else if (left.isZero) {
         Text(stringResource(R.string.check_in_tolerance_over), color = MaterialTheme.colorScheme.error)
     } else {
         Text(stringResource(R.string.check_in_tolerance_left, format(left)))

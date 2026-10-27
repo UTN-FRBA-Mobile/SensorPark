@@ -91,12 +91,21 @@ data class CheckInState(
         return if (left.isNegative) Duration.ZERO else left
     }
 
+    /** Desde cuándo se puede hacer el check-in; null sin reserva. */
+    val checkInOpensAt: Instant? get() = reservation?.let { ReservationRules.checkInOpensAt(it.arrivesAt) }
+
+    /** La reserva todavía no llegó a su ventana de check-in: la pantalla dice desde cuándo se puede. */
+    fun isTooEarly(now: Instant): Boolean {
+        val opensAt = checkInOpensAt ?: return false
+        return reservation?.status == ReservationStatus.CONFIRMED && now < opensAt
+    }
+
     /** El botón de confirmar sólo se habilita dentro de la ventana que acepta el backend. */
     fun canCheckIn(now: Instant): Boolean {
         val reservation = reservation ?: return false
         return !working &&
             reservation.status == ReservationStatus.CONFIRMED &&
-            now >= reservation.arrivesAt.minus(ReservationRules.EARLY_CHECK_IN) &&
+            !isTooEarly(now) &&
             now <= reservation.toleranceUntil
     }
 }

@@ -30,6 +30,7 @@ class GeofenceDaoTest {
         center = Coordinates(-34.5984, -58.4200),
         radiusMeters = 300,
         expiresAt = Instant.parse("2026-10-18T15:15:00Z"),
+        arrivesAt = Instant.parse("2026-10-18T15:00:00Z"),
     )
 
     @Before
