@@ -3,13 +3,12 @@ package com.sensorpark.feature.parking
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasContentDescription
-import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performScrollTo
 import com.sensorpark.core.testing.FakeFavoritesRepository
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeSpotAvailabilityRepository
@@ -84,7 +83,7 @@ class ParkingLotDetailScreenUiTest {
         )
         compose.show(spots)
 
-        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasContentDescription("Lugar 11", substring = true))
+        compose.onNode(hasContentDescription("Lugar 11", substring = true)).performScrollTo()
         compose.onNodeWithContentDescription("Lugar 01, libre").assertExists()
         compose.onNodeWithContentDescription("Lugar 02, ocupado").assertExists()
         compose.onNodeWithContentDescription("Lugar 11, libre, Moto").assertExists()
