@@ -22,8 +22,9 @@
     <string name="field_name">Nombre</string>
     <string name="field_email">Email</string>
     <string name="field_password">Contraseña</string>
+    <string name="role_selector_title">Elegí tu rol</string>
     <string name="role_driver">Conductor</string>
-    <string name="role_parking_admin">Administro un estacionamiento</string>
+    <string name="role_parking_admin">Administrador de estacionamiento</string>
     <string name="auth_error_weak_password">La contraseña debe tener al menos 6 caracteres.</string>
     <string name="auth_error_email_in_use">Ya existe una cuenta con ese email.</string>
     <string name="auth_error_invalid_credentials">Email o contraseña incorrectos.</string>
@@ -31,7 +32,7 @@
     <string name="auth_error_unknown">No se pudo completar la operación. Intentá de nuevo.</string>
 
     <!-- Categoría de prioridad -->
-    <string name="category_title">Prioridad para estacionar (opcional)</string>
+    <string name="category_title">Prioridad para estacionar</string>
     <string name="category_standard">Ninguna</string>
     <string name="category_pregnant">Embarazo</string>
     <string name="category_reduced_mobility">Movilidad reducida o discapacidad</string>
