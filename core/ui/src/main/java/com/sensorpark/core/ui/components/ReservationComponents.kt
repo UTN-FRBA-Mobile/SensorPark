@@ -1,13 +1,15 @@
 package com.sensorpark.core.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sensorpark.core.ui.R
 import com.sensorpark.core.ui.theme.SensorParkTheme
@@ -97,13 +99,14 @@ fun ReservationStatusBadge(status: ReservationStatus, modifier: Modifier = Modif
     Surface(
         color = color.container,
         contentColor = color.content,
-        shape = RoundedCornerShape(50),
+        shape = CircleShape,
+        border = BorderStroke(1.dp, color.content.copy(alpha = 0.3f)),
         modifier = modifier,
     ) {
         Text(
             text = status.label(),
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
         )
     }
 }
