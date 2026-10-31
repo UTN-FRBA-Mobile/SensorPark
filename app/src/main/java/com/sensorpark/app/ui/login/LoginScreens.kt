@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -56,6 +57,8 @@ import com.sensorpark.core.ui.components.PrimaryButton
 import com.sensorpark.domain.model.AuthErrorReason
 import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.Role
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 
 @Composable
 fun LoginScreen(onSignUp: () -> Unit, vm: AuthViewModel = hiltViewModel()) {
@@ -216,16 +219,48 @@ private fun RoleSelector(selected: Role, onSelect: (Role) -> Unit) {
         Role.DRIVER to stringResource(R.string.role_driver),
         Role.PARKING_ADMIN to stringResource(R.string.role_parking_admin),
     )
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        options.forEachIndexed { index, (role, label) ->
-            SegmentedButton(
-                selected = selected == role,
-                onClick = { onSelect(role) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-            ) { Text(label) }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.role_selector_title),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+        )
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max),
+        ) {
+            options.forEachIndexed { index, (role, label) ->
+                val isSelected = selected == role
+                SegmentedButton(
+                    modifier = Modifier.fillMaxHeight(),
+                    selected = isSelected,
+                    onClick = { onSelect(role) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                    icon = {}, // Desactivamos el slot nativo para que no quede pegado al borde izquierdo
+                    label = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                        ) {
+                            if (isSelected) {
+                                SegmentedButtonDefaults.Icon(active = true)
+                            }
+                            Text(
+                                text = label,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    },
+                )
+            }
         }
     }
 }
+
+
 
 @Composable
 private fun EmailField(value: String, onChange: (String) -> Unit) {
