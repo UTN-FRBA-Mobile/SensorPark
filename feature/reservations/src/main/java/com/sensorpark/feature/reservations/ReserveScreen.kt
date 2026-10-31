@@ -28,12 +28,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import com.sensorpark.core.ui.components.PrimaryButton
+import com.sensorpark.core.ui.components.ReservationStatusBadge
+import com.sensorpark.domain.model.ReservationStatus
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SelectableDates
@@ -255,9 +259,11 @@ private fun Form(state: ReserveState, vm: ReserveViewModel, onOpenMyReservations
                 onDismiss = vm::dismissError,
                 waitlistAction = if (!state.canJoinWaitlist) null else {
                     {
-                        Button(onClick = vm::joinWaitlist, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.reserve_join_waitlist))
-                        }
+                        PrimaryButton(
+                            text = stringResource(R.string.reserve_join_waitlist),
+                            onClick = vm::joinWaitlist,
+                            enabled = !state.working,
+                        )
                     }
                 },
             )
@@ -294,16 +300,39 @@ private fun failureMessage(state: ReserveState): String? = state.failure?.messag
 /** Anotado en la lista de espera: en qué lugar de la fila quedó y qué va a pasar. */
 @Composable
 private fun Joined(waitlist: WaitlistPosition, onOpenMyReservations: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.reserve_waitlist_joined_title), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.reserve_waitlist_joined_position, waitlist.position))
             Text(
-                stringResource(R.string.reserve_waitlist_joined_body),
+                text = stringResource(R.string.reserve_waitlist_joined_title),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            )
+            Text(
+                text = stringResource(R.string.reserve_waitlist_joined_position, waitlist.position),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = stringResource(R.string.reserve_waitlist_joined_body),
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            OutlinedButton(onClick = onOpenMyReservations, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.reserve_go_to_my_reservations))
+            OutlinedButton(
+                onClick = onOpenMyReservations,
+                shape = CircleShape,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.reserve_go_to_my_reservations),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                )
             }
         }
     }
@@ -317,12 +346,23 @@ private fun Problem(
     onDismiss: () -> Unit,
     waitlistAction: (@Composable () -> Unit)? = null,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(message)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             alternatives.forEach { alternative ->
                 Text(
-                    "· " + stringResource(
+                    text = "· " + stringResource(
                         when (alternative) {
                             is ReserveAlternative.ShorterDuration -> R.string.reserve_alternative_shorter
                             ReserveAlternative.AnotherTime -> R.string.reserve_alternative_another_time
@@ -335,6 +375,7 @@ private fun Problem(
                         },
                     ),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             waitlistAction?.invoke()
@@ -355,24 +396,120 @@ private fun Confirmation(
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(R.string.reserve_done_title), style = MaterialTheme.typography.headlineMedium)
-        state.parkingLot?.let { Text(it.name, style = MaterialTheme.typography.titleMedium) }
-        Text(stringResource(R.string.reserve_done_spot, confirmation.spotCode))
-        Text(
-            stringResource(
-                R.string.reserve_done_slot,
-                formatTime(confirmation.arrivesAt),
-                formatTime(confirmation.endsAt),
-            ),
+        ReservationConfirmedContent(
+            parkingLotName = state.parkingLot?.name,
+            parkingLotAddress = state.parkingLot?.address,
+            confirmation = confirmation,
+            onOpenMyReservations = onOpenMyReservations,
         )
-        Text(stringResource(R.string.reserve_done_tolerance, formatTime(confirmation.toleranceUntil)))
+    }
+}
 
-        Button(onClick = onOpenMyReservations, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.reserve_go_to_my_reservations))
+@Composable
+internal fun ReservationConfirmedContent(
+    parkingLotName: String?,
+    parkingLotAddress: String?,
+    confirmation: ReservationConfirmation,
+    onOpenMyReservations: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = stringResource(R.string.reserve_done_title),
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.weight(1f).padding(end = 12.dp),
+        )
+        ReservationStatusBadge(ReservationStatus.CONFIRMED)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (!parkingLotName.isNullOrBlank()) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = parkingLotName,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (!parkingLotAddress.isNullOrBlank()) {
+                        Text(
+                            text = parkingLotAddress,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DirectionsCar,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = stringResource(R.string.reserve_done_spot, confirmation.spotCode),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.reserve_done_slot,
+                        formatTime(confirmation.arrivesAt),
+                        formatTime(confirmation.endsAt),
+                    ),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                )
+            }
+
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = stringResource(R.string.reserve_done_tolerance, formatTime(confirmation.toleranceUntil)),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(12.dp),
+                )
+            }
         }
     }
+
+    PrimaryButton(
+        text = stringResource(R.string.reserve_go_to_my_reservations),
+        onClick = onOpenMyReservations,
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
