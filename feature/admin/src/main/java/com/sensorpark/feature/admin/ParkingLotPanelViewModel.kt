@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -59,10 +60,18 @@ class ParkingLotPanelViewModel @Inject constructor(
     private data class Request(val id: String, val attempt: Int = 0)
 
     private val request = MutableStateFlow<Request?>(null)
+    @Volatile
+    private var loadedLotId: String? = null
+    @Volatile
+    private var loadedSpotsId: String? = null
 
     /** null mientras carga. */
     val result: StateFlow<DataResult<ParkingLot>?> = request.filterNotNull()
-        .flatMapLatest { repository.parkingLot(it.id).onStart<DataResult<ParkingLot>?> { emit(null) } }
+        .flatMapLatest { req ->
+            repository.parkingLot(req.id)
+                .onEach { if (it is DataResult.Success) loadedLotId = req.id }
+                .onStart<DataResult<ParkingLot>?> { if (loadedLotId != req.id) emit(null) }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Los lugares, por código. null mientras cargan. */
@@ -72,7 +81,8 @@ class ParkingLotPanelViewModel @Inject constructor(
                 .map<DataResult<SpotAvailability>, List<Spot>?> { result ->
                     (result as? DataResult.Success)?.value?.spots.orEmpty().sortedBy { it.code }
                 }
-                .onStart { emit(null) }
+                .onEach { if (it != null) loadedSpotsId = request.id }
+                .onStart { if (loadedSpotsId != request.id) emit(null) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -102,7 +112,11 @@ class ParkingLotPanelViewModel @Inject constructor(
 
     fun load(id: String) = request.update { if (it?.id == id) it else Request(id) }
 
-    fun retry() = request.update { it?.copy(attempt = it.attempt + 1) }
+    fun retry() {
+        loadedLotId = null
+        loadedSpotsId = null
+        request.update { it?.copy(attempt = it.attempt + 1) }
+    }
 
     fun dismissError() = _action.update { SpotAction() }
 
