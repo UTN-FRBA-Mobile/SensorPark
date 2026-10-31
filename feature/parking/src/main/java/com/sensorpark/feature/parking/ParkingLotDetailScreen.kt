@@ -7,17 +7,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -100,6 +100,8 @@ fun ParkingLotDetailScreen(
     }
 }
 
+private const val GRID_COLUMNS = 4
+
 @Composable
 private fun Detail(
     lot: ParkingLot,
@@ -121,46 +123,83 @@ private fun Detail(
             else -> emptyList()
         }
     }
+    val rows = remember(cells) { cells.chunked(GRID_COLUMNS) }
+    val visibleTypes = remember(lot) { SpotType.entries.filter { lot.capacityOf(it) > 0 } }
     val currentOnReserveSpot by rememberUpdatedState(onReserveSpot)
     val onCellClick = remember { { cell: SpotCell -> currentOnReserveSpot(cell.toSpot()) } }
-    val full: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
 
     Column(Modifier.fillMaxSize()) {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 72.dp),
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item(key = "header", span = full) {
-                Header(lot, spots, favorite, onToggleFavorite)
+            Header(lot, spots, favorite, onToggleFavorite)
+            OccupancyCard(lot)
+
+            if (visibleTypes.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.detail_by_type),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    visibleTypes.forEach { type ->
+                        SpotTypeRow(
+                            label = type.label(),
+                            free = lot.freeSpotsOf(type),
+                            capacity = lot.capacityOf(type),
+                        )
+                    }
+                }
             }
-            item(key = "occupancy", span = full) { OccupancyCard(lot) }
-            item(key = "types", span = full) { ByType(lot) }
-            item(key = "plan-header", span = full) { PlanHeader() }
+
+            PlanHeader()
 
             when {
-                spots is SpotAvailabilityState.Loading -> item(key = "plan-loading", span = full) {
+                spots is SpotAvailabilityState.Loading -> {
                     Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(Modifier.size(28.dp))
                     }
                 }
-                spots is SpotAvailabilityState.Failure -> item(key = "plan-error", span = full) {
+                spots is SpotAvailabilityState.Failure -> {
                     Column(Modifier.fillMaxWidth().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(stringResource(R.string.plan_error), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         TextButton(onClick = onRetrySpots) { Text(stringResource(CoreR.string.action_retry)) }
                     }
                 }
-                cells.isEmpty() -> item(key = "plan-empty", span = full) {
+                rows.isEmpty() -> {
                     Text(
                         stringResource(R.string.plan_empty),
                         modifier = Modifier.padding(8.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                else -> items(cells, key = { it.id }, contentType = { "spot" }) { cell ->
-                    SpotCellView(cell, onReserve = onCellClick)
+                else -> {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rows.forEach { rowCells ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                rowCells.forEach { cell ->
+                                    androidx.compose.runtime.key(cell.id) {
+                                        SpotCellView(
+                                            cell = cell,
+                                            onReserve = onCellClick,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                    }
+                                }
+                                repeat(GRID_COLUMNS - rowCells.size) {
+                                    Spacer(Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -177,6 +216,8 @@ private fun Detail(
                             Toast.makeText(context, directionsUnavailable, Toast.LENGTH_SHORT).show()
                         }
                     },
+                    shape = CircleShape,
+                    modifier = Modifier.heightIn(min = 52.dp),
                 ) { Text(stringResource(CoreR.string.directions_action)) }
                 PrimaryButton(
                     text = stringResource(if (lot.freeSpots > 0) R.string.detail_reserve else R.string.detail_no_free_spots),
@@ -237,34 +278,27 @@ private fun OccupancyCard(lot: ParkingLot) {
     }
 }
 
+private val SpotTypeRowShape = RoundedCornerShape(12.dp)
+
 @Composable
-private fun ByType(lot: ParkingLot) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = stringResource(R.string.detail_by_type),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        SpotType.entries.filter { lot.capacityOf(it) > 0 }.forEach { type ->
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = type.label(),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    AvailabilityBadge(lot.freeSpotsOf(type), lot.capacityOf(type))
-                }
-            }
+private fun SpotTypeRow(label: String, free: Int, capacity: Int) {
+    Surface(
+        shape = SpotTypeRowShape,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            AvailabilityBadge(free, capacity)
         }
     }
 }
@@ -321,6 +355,9 @@ private fun ConnectionStatus(state: SpotAvailabilityState) {
 }
 
 private val timeFormat = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
+private val pesoFormat = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-AR")).apply {
+    maximumFractionDigits = 0
+}
 
 private fun formatTime(instant: Instant): String = timeFormat.format(instant)
 
@@ -338,7 +375,6 @@ private fun Info(lot: ParkingLot) {
         }
         if (lot.hourlyRate > 0) {
             // La tarifa está en pesos argentinos.
-            val pesoFormat = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-AR")).apply { maximumFractionDigits = 0 }
             add(stringResource(R.string.detail_rate) to stringResource(R.string.detail_rate_value, pesoFormat.format(lot.hourlyRate)))
         }
     }
