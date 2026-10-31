@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -28,6 +29,8 @@ class ManagedParkingLotsViewModel @Inject constructor(
     private data class Request(val uid: String, val seesAll: Boolean, val attempt: Int = 0)
 
     private val request = MutableStateFlow<Request?>(null)
+    @Volatile
+    private var hasLoaded = false
 
     /** null mientras carga. */
     val result: StateFlow<DataResult<List<ParkingLot>>?> = request.filterNotNull()
@@ -38,12 +41,16 @@ class ManagedParkingLotsViewModel @Inject constructor(
                         lots.filter { request.seesAll || request.uid in it.adminUids }.sortedBy { it.name }
                     }
                 }
-                .onStart<DataResult<List<ParkingLot>>?> { emit(null) }
+                .onEach { if (it is DataResult.Success) hasLoaded = true }
+                .onStart<DataResult<List<ParkingLot>>?> { if (!hasLoaded) emit(null) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun load(uid: String, seesAll: Boolean) =
         request.update { if (it?.uid == uid && it.seesAll == seesAll) it else Request(uid, seesAll) }
 
-    fun retry() = request.update { it?.copy(attempt = it.attempt + 1) }
+    fun retry() {
+        hasLoaded = false
+        request.update { it?.copy(attempt = it.attempt + 1) }
+    }
 }

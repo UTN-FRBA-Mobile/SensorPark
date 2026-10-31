@@ -221,6 +221,7 @@ private fun NavHostController.openTabAtStart(tab: Tab) {
  * directo a una pantalla interna), lo abre.
  */
 private fun NavHostController.goToTabStart(tab: Tab) {
+    if (currentDestination?.route == tab.start.pattern) return
     if (!popBackStack(tab.start.pattern, inclusive = false)) {
         navigate(tab.start.pattern.substringBefore("?")) { launchSingleTop = true }
     }
