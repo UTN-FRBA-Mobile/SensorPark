@@ -17,7 +17,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,10 +24,10 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.sensorpark.core.ui.theme.SensorParkTheme
 import com.sensorpark.domain.model.DataResult
 import com.sensorpark.domain.model.NearbyParkingLot
 
-private val Green = Color(0xFF2E7D32)
 private val BuenosAires = LatLng(-34.6037, -58.3816)
 
 /** Lista de chequeos de la configuración de Firebase y Maps. */
@@ -103,7 +102,8 @@ private fun ParkingLots(result: DataResult<List<NearbyParkingLot>>?) {
 @Composable
 private fun CheckRow(check: Check) {
     val (mark, color) = when (check.status) {
-        CheckStatus.OK -> "✓" to Green
+//        CheckStatus.OK -> "✓" to Green
+        CheckStatus.OK -> "✓" to SensorParkTheme.colors.positive.content
         CheckStatus.ERROR -> "✗" to MaterialTheme.colorScheme.error
         CheckStatus.RUNNING -> "…" to MaterialTheme.colorScheme.onSurfaceVariant
         CheckStatus.NOT_RUN -> "–" to MaterialTheme.colorScheme.onSurfaceVariant
