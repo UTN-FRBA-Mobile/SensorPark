@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -17,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -40,8 +42,8 @@ fun CreateParkingLotScreen(
     LaunchedEffect(state.savedId) { state.savedId?.let(onCreated) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         Text(
-            stringResource(R.string.admin_create_title),
-            style = MaterialTheme.typography.headlineSmall,
+            text = stringResource(R.string.admin_create_title),
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
             modifier = Modifier.padding(bottom = 12.dp),
         )
         ParkingLotForm(state, onEdit = vm::edit, onSave = vm::save, saveLabel = R.string.admin_form_create)
@@ -71,7 +73,7 @@ internal fun ParkingLotForm(
 ) {
     val input = state.input
     val problems = state.problems
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Field(R.string.admin_form_name, input.name, ParkingLotField.NAME in problems, R.string.admin_form_name_error) {
             onEdit { i -> i.copy(name = it) }
         }
@@ -97,7 +99,7 @@ internal fun ParkingLotForm(
             }
         }
         Text(
-            stringResource(R.string.admin_form_schedule_hint),
+            text = stringResource(R.string.admin_form_schedule_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -116,14 +118,25 @@ internal fun ParkingLotForm(
             R.string.admin_form_rate_error, KeyboardType.Number,
         ) { onEdit { i -> i.copy(hourlyRate = it) } }
 
-        state.failure?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
+        state.failure?.let {
+            Text(
+                text = it.message(),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         if (state.saved) {
-            Text(stringResource(R.string.admin_form_saved), color = MaterialTheme.colorScheme.primary)
+            Text(
+                text = stringResource(R.string.admin_form_saved),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
         PrimaryButton(
             text = stringResource(if (state.saving) R.string.admin_form_saving else saveLabel),
             onClick = onSave,
             enabled = !state.saving,
+            loading = state.saving,
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         )
     }
@@ -146,6 +159,7 @@ private fun Field(
         label = { Text(stringResource(label)) },
         isError = isError,
         singleLine = true,
+        shape = RoundedCornerShape(14.dp),
         keyboardOptions = KeyboardOptions(keyboardType = keyboard),
         supportingText = if (isError && error != null) {
             { Text(stringResource(error, *errorArgs)) }

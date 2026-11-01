@@ -1,28 +1,40 @@
 package com.sensorpark.app.ui.account
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,15 +67,60 @@ fun AccountScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(R.string.account_title), style = MaterialTheme.typography.headlineSmall)
-        Column {
-            Text(state.session.email, style = MaterialTheme.typography.titleMedium)
-            state.role?.let {
-                Text(it.label(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = stringResource(R.string.account_title),
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Person,
+                        contentDescription = null,
+                        modifier = Modifier.padding(12.dp).size(26.dp),
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = state.session.email,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    state.role?.let { role ->
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ) {
+                            Text(
+                                text = role.label(),
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                            )
+                        }
+                    }
+                }
             }
         }
 
-        HorizontalDivider()
         ThemeSelector(
             selected = themeMode,
             onSelect = vm::setThemeMode,
@@ -71,27 +128,55 @@ fun AccountScreen(
 
         val current = category
         if (state.role == Role.DRIVER && current != null) {
-            HorizontalDivider()
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             CategorySelector(selected = current, onSelect = vm::setCategory)
         }
 
-        HorizontalDivider()
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         NotificationPreferences(
             preferences = notifications,
             onToggle = vm::setNotificationEnabled,
         )
 
         if (BuildConfig.DEBUG || state.role == Role.ADMIN) {
-            HorizontalDivider()
-            Text(stringResource(R.string.account_dev_tools), style = MaterialTheme.typography.titleSmall)
-            OutlinedButton(onClick = onOpenDiagnostics, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.account_diagnostics))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.account_dev_tools),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                )
+                OutlinedButton(
+                    onClick = onOpenDiagnostics,
+                    shape = CircleShape,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = stringResource(R.string.account_diagnostics),
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    )
+                }
             }
         }
 
-        HorizontalDivider()
-        TextButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.action_sign_out))
+        OutlinedButton(
+            onClick = onSignOut,
+            shape = CircleShape,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error,
+            ),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.Logout,
+                contentDescription = null,
+                modifier = Modifier.padding(end = 8.dp).size(18.dp),
+            )
+            Text(
+                text = stringResource(R.string.action_sign_out),
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            )
         }
     }
 }
@@ -103,7 +188,10 @@ private fun ThemeSelector(
     onSelect: (ThemeMode) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.account_theme), style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = stringResource(R.string.account_theme),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+        )
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             ThemeMode.entries.forEachIndexed { index, mode ->
                 SegmentedButton(
@@ -133,10 +221,10 @@ private fun NotificationPreferences(
     preferences: NotificationPreferences,
     onToggle: (NotificationType, Boolean) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = stringResource(R.string.account_notifications),
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
         )
         NotificationType.entries.forEach { type ->
             Row(
@@ -147,6 +235,8 @@ private fun NotificationPreferences(
                 Text(
                     text = stringResource(type.label()),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
                 )
                 Switch(
                     checked = preferences.isEnabled(type),

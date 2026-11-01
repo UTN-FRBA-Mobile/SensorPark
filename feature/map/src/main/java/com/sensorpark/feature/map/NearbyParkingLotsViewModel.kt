@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -100,6 +101,8 @@ class NearbyParkingLotsViewModel internal constructor(
 
     // Cada reintento vuelve a suscribirse: después de un error el flow del repositorio termina.
     private val retries = MutableStateFlow(0)
+    @Volatile
+    private var hasLoaded = false
     private var locationJob: Job? = null
 
     /** Los favoritos, del teléfono: se ven también sin conexión. */
@@ -108,7 +111,11 @@ class NearbyParkingLotsViewModel internal constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptySet())
 
     private val allLots: StateFlow<DataResult<List<ParkingLot>>?> = retries
-        .flatMapLatest { parkingLots.parkingLots().onStart<DataResult<List<ParkingLot>>?> { emit(null) } }
+        .flatMapLatest {
+            parkingLots.parkingLots()
+                .onEach { if (it is DataResult.Success) hasLoaded = true }
+                .onStart<DataResult<List<ParkingLot>>?> { if (!hasLoaded) emit(null) }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /** null mientras carga. */
@@ -189,7 +196,10 @@ class NearbyParkingLotsViewModel internal constructor(
         _selectedId.value = parkingLotId
     }
 
-    fun retry() = retries.update { it + 1 }
+    fun retry() {
+        hasLoaded = false
+        retries.update { it + 1 }
+    }
 
     private fun fallBackToDefaultZone() {
         locationJob?.cancel()
