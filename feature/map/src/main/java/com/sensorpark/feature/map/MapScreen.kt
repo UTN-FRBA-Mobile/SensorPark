@@ -23,12 +23,16 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -166,12 +170,16 @@ fun MapScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Header(origin: Origin, viewMode: ViewMode, onViewMode: (ViewMode) -> Unit) {
     val radius = formatDistance(NearbyParkingLotsViewModel.RADIUS_METERS)
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Column {
-            Text(stringResource(R.string.nearby_title), style = MaterialTheme.typography.headlineSmall)
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = stringResource(R.string.nearby_title),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            )
             Text(
                 text = when (origin.source) {
                     OriginSource.DEVICE -> stringResource(R.string.nearby_subtitle_device, radius)
@@ -179,23 +187,35 @@ private fun Header(origin: Origin, viewMode: ViewMode, onViewMode: (ViewMode) ->
                         stringResource(R.string.nearby_subtitle_default, radius, NearbyParkingLotsViewModel.DEFAULT_ZONE_NAME)
                     OriginSource.MAP_AREA -> stringResource(R.string.nearby_subtitle_area, radius)
                 },
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = viewMode == ViewMode.MAP,
-                onClick = { onViewMode(ViewMode.MAP) },
-                label = { Text(stringResource(R.string.nearby_view_map)) },
-                leadingIcon = { Icon(Icons.Filled.Map, contentDescription = null) },
-            )
-            FilterChip(
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
                 selected = viewMode == ViewMode.LIST,
                 onClick = { onViewMode(ViewMode.LIST) },
-                label = { Text(stringResource(R.string.nearby_view_list)) },
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
-            )
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                icon = {
+                    SegmentedButtonDefaults.Icon(active = viewMode == ViewMode.LIST) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
+                    }
+                },
+            ) {
+                Text(stringResource(R.string.nearby_view_list))
+            }
+            SegmentedButton(
+                selected = viewMode == ViewMode.MAP,
+                onClick = { onViewMode(ViewMode.MAP) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                icon = {
+                    SegmentedButtonDefaults.Icon(active = viewMode == ViewMode.MAP) {
+                        Icon(Icons.Filled.Map, contentDescription = null)
+                    }
+                },
+            ) {
+                Text(stringResource(R.string.nearby_view_map))
+            }
         }
     }
 }
@@ -281,23 +301,19 @@ private fun ParkingLotList(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(lots, key = { it.parkingLot.id }, contentType = { "parking-lot" }) { (lot, distance) ->
-            Column {
-                ParkingLotCard(
-                    name = lot.name,
-                    subtitle = "${formatDistance(distance)} · ${lot.address}",
-                    freeSpots = lot.freeSpots,
-                    capacity = lot.capacity,
-                    onClick = { open.value(lot.id) },
-                    footer = spotType?.let {
-                        stringResource(R.string.nearby_free_of_type, it.label(), lot.freeSpotsOf(it), lot.capacityOf(it))
-                    },
-                    favorite = lot.id in favoriteIds,
-                    onToggleFavorite = { toggle.value(lot.id) },
-                )
-                TextButton(onClick = { directions.value(lot) }) {
-                    Text(stringResource(CoreR.string.directions_action))
-                }
-            }
+            ParkingLotCard(
+                name = lot.name,
+                subtitle = "${formatDistance(distance)} · ${lot.address}",
+                freeSpots = lot.freeSpots,
+                capacity = lot.capacity,
+                onClick = { open.value(lot.id) },
+                footer = spotType?.let {
+                    stringResource(R.string.nearby_free_of_type, it.label(), lot.freeSpotsOf(it), lot.capacityOf(it))
+                },
+                favorite = lot.id in favoriteIds,
+                onToggleFavorite = { toggle.value(lot.id) },
+                onDirections = { directions.value(lot) },
+            )
         }
     }
 }

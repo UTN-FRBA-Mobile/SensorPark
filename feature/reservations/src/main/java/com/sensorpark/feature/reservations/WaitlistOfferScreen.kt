@@ -1,5 +1,6 @@
 package com.sensorpark.feature.reservations
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,10 +8,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -24,10 +27,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sensorpark.core.ui.components.LoadingContent
+import com.sensorpark.core.ui.components.PrimaryButton
 import com.sensorpark.core.ui.components.formatCountdown
 import com.sensorpark.core.ui.components.formatDateAndTime
 import com.sensorpark.core.ui.components.formatTime
@@ -74,7 +79,7 @@ fun WaitlistOfferScreen(
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         when {
             confirmation != null -> Accepted(state.parkingLotName, confirmation, onOpenMyReservations)
@@ -104,69 +109,146 @@ private fun Offer(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
 ) {
-    Text(stringResource(R.string.waitlist_offer_title), style = MaterialTheme.typography.headlineMedium)
-    Text(state.parkingLotName, style = MaterialTheme.typography.titleMedium)
+    Text(
+        text = stringResource(R.string.waitlist_offer_title),
+        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+    )
 
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+    ) {
         Column(
-            Modifier
+            modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(stringResource(R.string.waitlist_offer_time_left), style = MaterialTheme.typography.labelLarge)
             Text(
-                formatCountdown(state.timeLeft(now)),
-                style = MaterialTheme.typography.displayMedium,
+                text = stringResource(R.string.waitlist_offer_time_left),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = formatCountdown(state.timeLeft(now)),
+                style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.primary,
             )
         }
     }
 
-    Text(stringResource(R.string.waitlist_offer_spot, entry.offer?.spotCode.orEmpty(), entry.spotType.label()))
-    Text(stringResource(R.string.waitlist_offer_slot, formatDateAndTime(entry.arrivesAt), formatTime(entry.endsAt)))
-    Text(
-        stringResource(R.string.waitlist_offer_hint),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.bodyMedium,
-    )
-
-    Button(onClick = onAccept, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(if (state.working) R.string.waitlist_offer_working else R.string.waitlist_offer_accept))
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = state.parkingLotName,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+            Text(
+                text = stringResource(R.string.waitlist_offer_spot, entry.offer?.spotCode.orEmpty(), entry.spotType.label()),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            )
+            Text(
+                text = stringResource(R.string.waitlist_offer_slot, formatDateAndTime(entry.arrivesAt), formatTime(entry.endsAt)),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = stringResource(R.string.waitlist_offer_hint),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
-    OutlinedButton(onClick = onDecline, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.waitlist_offer_decline))
+
+    PrimaryButton(
+        text = stringResource(if (state.working) R.string.waitlist_offer_working else R.string.waitlist_offer_accept),
+        onClick = onAccept,
+        enabled = !state.working,
+        loading = state.working,
+    )
+    OutlinedButton(
+        onClick = onDecline,
+        enabled = !state.working,
+        shape = CircleShape,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = stringResource(R.string.waitlist_offer_decline),
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+        )
     }
 }
 
 @Composable
 private fun Accepted(parkingLotName: String, confirmation: ReservationConfirmation, onOpenMyReservations: () -> Unit) {
-    Text(stringResource(R.string.reserve_done_title), style = MaterialTheme.typography.headlineMedium)
-    Text(parkingLotName, style = MaterialTheme.typography.titleMedium)
-    Text(stringResource(R.string.reserve_done_spot, confirmation.spotCode))
-    Text(stringResource(R.string.reserve_done_slot, formatTime(confirmation.arrivesAt), formatTime(confirmation.endsAt)))
-    Text(stringResource(R.string.reserve_done_tolerance, formatTime(confirmation.toleranceUntil)))
-    Button(onClick = onOpenMyReservations, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.reserve_go_to_my_reservations))
-    }
+    ReservationConfirmedContent(
+        parkingLotName = parkingLotName,
+        parkingLotAddress = null,
+        confirmation = confirmation,
+        onOpenMyReservations = onOpenMyReservations,
+    )
 }
 
 /** La oferta ya no se puede contestar: por qué, y a dónde seguir. */
 @Composable
 private fun Closed(message: String, onOpenMyReservations: () -> Unit) {
-    Text(stringResource(R.string.waitlist_offer_title_closed), style = MaterialTheme.typography.headlineMedium)
-    Text(message)
-    Button(onClick = onOpenMyReservations, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.reserve_go_to_my_reservations))
+    Text(
+        text = stringResource(R.string.waitlist_offer_title_closed),
+        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(16.dp),
+        )
     }
+    PrimaryButton(
+        text = stringResource(R.string.reserve_go_to_my_reservations),
+        onClick = onOpenMyReservations,
+    )
 }
 
 @Composable
 private fun Problem(message: String, onDismiss: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(message)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.reserve_dismiss)) }
         }
     }

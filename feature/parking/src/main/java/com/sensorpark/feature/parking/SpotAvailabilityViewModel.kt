@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -60,16 +61,22 @@ class SpotAvailabilityViewModel @Inject constructor(
     private data class Request(val id: String, val attempt: Int = 0)
 
     private val request = MutableStateFlow<Request?>(null)
+    @Volatile
+    private var loadedId: String? = null
 
     val state: StateFlow<SpotAvailabilityState> = request.filterNotNull()
         .flatMapLatest { current ->
             repository.observeSpots(current.id)
                 .map { it.toState() }
-                .onStart { emit(SpotAvailabilityState.Loading) }
+                .onEach { if (it !is SpotAvailabilityState.Failure) loadedId = current.id }
+                .onStart { if (loadedId != current.id) emit(SpotAvailabilityState.Loading) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpotAvailabilityState.Loading)
 
     fun load(parkingLotId: String) = request.update { if (it?.id == parkingLotId) it else Request(parkingLotId) }
 
-    fun retry() = request.update { it?.copy(attempt = it.attempt + 1) }
+    fun retry() {
+        loadedId = null
+        request.update { it?.copy(attempt = it.attempt + 1) }
+    }
 }

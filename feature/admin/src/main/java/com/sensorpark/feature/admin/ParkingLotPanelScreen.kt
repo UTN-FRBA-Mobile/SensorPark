@@ -1,5 +1,6 @@
 package com.sensorpark.feature.admin
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,11 +14,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -36,11 +42,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -95,18 +103,34 @@ private fun Panel(lot: ParkingLot, vm: ParkingLotPanelViewModel, formVm: Parking
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(lot.name, style = MaterialTheme.typography.headlineSmall)
-                Text(lot.address, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = lot.name,
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                )
+                Text(
+                    text = lot.address,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             AvailabilityBadge(lot.freeSpots, lot.capacity)
         }
-        TabRow(selectedTabIndex = selected) {
+        TabRow(
+            selectedTabIndex = selected,
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
             PanelTab.entries.forEachIndexed { index, tab ->
+                val isSelected = selected == index
                 Tab(
-                    selected = selected == index,
+                    selected = isSelected,
                     onClick = { selected = index },
-                    text = { Text(stringResource(tab.title)) },
+                    text = {
+                        Text(
+                            text = stringResource(tab.title),
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    },
                 )
             }
         }
@@ -133,15 +157,21 @@ private fun SpotsTab(vm: ParkingLotPanelViewModel) {
     }
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
             OutlinedButton(
                 onClick = { editing = SpotEdit(SpotDraft(code = SpotDraft.nextCode(current.map { it.code })), isNew = true) },
+                shape = CircleShape,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Filled.Add, contentDescription = null)
-                Text(stringResource(R.string.admin_spots_add), modifier = Modifier.padding(start = 8.dp))
+                Text(
+                    text = stringResource(R.string.admin_spots_add),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(start = 8.dp),
+                )
             }
         }
         action.rejection?.let { item { Problem(it.message(), vm::dismissError) } }
@@ -197,13 +227,22 @@ private fun SpotRow(
     onToggleService: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.admin_spot_code, spot.code), style = MaterialTheme.typography.titleMedium)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        spot.priorityCategory?.let { stringResource(R.string.admin_spot_type_for, spot.type.label(), it.adminLabel()) }
+                        text = stringResource(R.string.admin_spot_code, spot.code),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    )
+                    Text(
+                        text = spot.priorityCategory?.let { stringResource(R.string.admin_spot_type_for, spot.type.label(), it.adminLabel()) }
                             ?: spot.type.label(),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -211,8 +250,11 @@ private fun SpotRow(
                 }
                 SpotStatusChip(spot.status)
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = onEdit, enabled = !working) { Text(stringResource(R.string.admin_spots_edit)) }
+                TextButton(onClick = onEdit, enabled = !working) {
+                    Text(stringResource(R.string.admin_spots_edit))
+                }
                 TextButton(onClick = onToggleService, enabled = !working) {
                     Text(
                         stringResource(
@@ -221,7 +263,13 @@ private fun SpotRow(
                         ),
                     )
                 }
-                TextButton(onClick = onDelete, enabled = !working) { Text(stringResource(R.string.admin_spots_delete)) }
+                TextButton(
+                    onClick = onDelete,
+                    enabled = !working,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text(stringResource(R.string.admin_spots_delete))
+                }
             }
         }
     }
@@ -251,6 +299,7 @@ private fun SpotDialog(
                     label = { Text(stringResource(R.string.admin_spot_code_label)) },
                     // El código es el id del lugar: no se cambia una vez creado.
                     enabled = edit.isNew,
+                    shape = RoundedCornerShape(14.dp),
                     isError = SpotProblem.CODE_REQUIRED in problems || SpotProblem.CODE_TAKEN in problems,
                     supportingText = when {
                         SpotProblem.CODE_REQUIRED in problems -> { { Text(stringResource(R.string.admin_spot_code_required)) } }
@@ -301,7 +350,6 @@ private fun SpotDialog(
 }
 
 /** El día: cómo están los lugares ahora y qué pasó con las reservas de hoy. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TodayTab(vm: ParkingLotPanelViewModel) {
     val summary by vm.summary.collectAsStateWithLifecycle()
@@ -309,29 +357,25 @@ private fun TodayTab(vm: ParkingLotPanelViewModel) {
     val hourly by vm.hourly.collectAsStateWithLifecycle()
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text(stringResource(R.string.admin_today_spots), style = MaterialTheme.typography.titleMedium)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Count(R.string.admin_today_free, summary.free)
-                Count(R.string.admin_today_occupied, summary.occupied)
-                Count(R.string.admin_today_reserved, summary.reserved)
-                Count(R.string.admin_today_out_of_service, summary.outOfService)
-            }
+            SummarySectionCard(
+                title = stringResource(R.string.admin_today_spots),
+                firstRow = Pair(R.string.admin_today_free, summary.free) to
+                    Pair(R.string.admin_today_occupied, summary.occupied),
+                secondRow = Pair(R.string.admin_today_reserved, summary.reserved) to
+                    Pair(R.string.admin_today_out_of_service, summary.outOfService),
+            )
         }
         item {
-            Text(
-                stringResource(R.string.admin_today_reservations, summary.reservations),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 8.dp),
+            SummarySectionCard(
+                title = stringResource(R.string.admin_today_reservations, summary.reservations),
+                firstRow = Pair(R.string.admin_today_active, summary.active) to
+                    Pair(R.string.admin_today_finished, summary.finished),
+                secondRow = Pair(R.string.admin_today_cancelled, summary.cancelled) to
+                    Pair(R.string.admin_today_expired, summary.expired),
             )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Count(R.string.admin_today_active, summary.active)
-                Count(R.string.admin_today_finished, summary.finished)
-                Count(R.string.admin_today_cancelled, summary.cancelled)
-                Count(R.string.admin_today_expired, summary.expired)
-            }
         }
         item { HourlyChart(hourly) }
         if (reservations.isEmpty()) {
@@ -342,27 +386,83 @@ private fun TodayTab(vm: ParkingLotPanelViewModel) {
 }
 
 @Composable
-private fun Count(label: Int, value: Int) {
-    Card {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-            Text(value.toString(), style = MaterialTheme.typography.headlineSmall)
-            Text(stringResource(label), style = MaterialTheme.typography.bodySmall)
+private fun SummarySectionCard(
+    title: String,
+    firstRow: Pair<Pair<Int, Int>, Pair<Int, Int>>,
+    secondRow: Pair<Pair<Int, Int>, Pair<Int, Int>>,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Count(firstRow.first.first, firstRow.first.second, Modifier.weight(1f))
+                Count(firstRow.second.first, firstRow.second.second, Modifier.weight(1f))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Count(secondRow.first.first, secondRow.first.second, Modifier.weight(1f))
+                Count(secondRow.second.first, secondRow.second.second, Modifier.weight(1f))
+            }
         }
     }
 }
 
 @Composable
+private fun Count(label: Int, value: Int, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = value.toString(),
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = stringResource(label),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun TodayReservationRow(reservation: Reservation) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
-                stringResource(
+                text = stringResource(
                     R.string.admin_today_reservation,
                     reservation.spotCode,
                     formatTime(reservation.arrivesAt),
                     formatTime(reservation.endsAt),
                 ),
-                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
             ReservationStatusBadge(reservation.status)
         }
@@ -371,9 +471,16 @@ private fun TodayReservationRow(reservation: Reservation) {
 
 @Composable
 private fun Problem(message: String, onDismiss: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(message)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(message, style = MaterialTheme.typography.bodyMedium)
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.admin_dismiss)) }
         }
     }
@@ -403,30 +510,60 @@ private fun HourlyChart(hours: List<Int>) {
     }
     val bar = MaterialTheme.colorScheme.primary
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
-    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(stringResource(R.string.admin_today_chart), style = MaterialTheme.typography.titleMedium)
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .semantics { contentDescription = description },
-        ) {
-            val slot = size.width / hours.size
-            val gap = slot * 0.2f
-            hours.forEachIndexed { hour, count ->
-                val left = hour * slot + gap / 2
-                drawRect(track, topLeft = Offset(left, 0f), size = Size(slot - gap, size.height))
-                if (count > 0) {
-                    val height = size.height * count / max
-                    drawRect(bar, topLeft = Offset(left, size.height - height), size = Size(slot - gap, height))
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.admin_today_chart),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            )
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .semantics { contentDescription = description },
+            ) {
+                val slot = size.width / hours.size
+                val gap = slot * 0.22f
+                val corner = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                hours.forEachIndexed { hour, count ->
+                    val left = hour * slot + gap / 2
+                    drawRoundRect(
+                        color = track,
+                        topLeft = Offset(left, 0f),
+                        size = Size(slot - gap, size.height),
+                        cornerRadius = corner,
+                    )
+                    if (count > 0) {
+                        val height = size.height * count / max
+                        drawRoundRect(
+                            color = bar,
+                            topLeft = Offset(left, size.height - height),
+                            size = Size(slot - gap, height),
+                            cornerRadius = corner,
+                        )
+                    }
                 }
             }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            listOf(0, 6, 12, 18, 23).forEach {
-                Text(stringResource(R.string.admin_today_chart_hour, it), style = MaterialTheme.typography.labelSmall)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf(0, 6, 12, 18, 23).forEach {
+                    Text(
+                        text = stringResource(R.string.admin_today_chart_hour, it),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

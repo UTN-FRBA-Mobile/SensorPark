@@ -1,18 +1,27 @@
 package com.sensorpark.feature.checkin
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DirectionsCar
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,10 +33,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sensorpark.core.ui.components.LoadingContent
+import com.sensorpark.core.ui.components.PrimaryButton
+import com.sensorpark.core.ui.components.ReservationStatusBadge
 import com.sensorpark.core.ui.components.formatAmount
+import com.sensorpark.core.ui.theme.SensorParkTheme
 import com.sensorpark.domain.model.CheckOutSummary
 import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.model.Reservation
@@ -60,26 +74,29 @@ fun CheckInScreen(reservationId: String, vm: CheckInViewModel = hiltViewModel())
         }
     }
 
+    if (state.loading) {
+        LoadingContent()
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         when {
-            state.loading -> Loading()
-            state.notFound -> Text(stringResource(R.string.check_in_not_found))
-            state.failure != null -> Text(stringResource(R.string.check_in_failure))
+            state.notFound -> NoticeCard(stringResource(R.string.check_in_not_found))
+            state.failure != null -> NoticeCard(stringResource(R.string.check_in_failure))
             else -> {
                 val reservation = state.reservation
                 val lot = state.parkingLot
                 if (reservation == null) {
-                    Text(stringResource(R.string.check_in_not_found))
+                    NoticeCard(stringResource(R.string.check_in_not_found))
                 } else {
                     Details(reservation, lot)
-                    HorizontalDivider()
                     val summary = state.summary
                     when {
                         summary != null -> Summary(summary, reservation)
@@ -99,28 +116,100 @@ fun CheckInScreen(reservationId: String, vm: CheckInViewModel = hiltViewModel())
 }
 
 @Composable
-private fun Loading() {
-    Column(
+private fun NoticeCard(text: String) {
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        CircularProgressIndicator()
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(16.dp),
+        )
     }
 }
 
 @Composable
 private fun Details(reservation: Reservation, lot: ParkingLot?) {
-    Text(stringResource(R.string.check_in_title), style = MaterialTheme.typography.headlineMedium)
-    Text(lot?.name ?: stringResource(R.string.check_in_unknown_lot), style = MaterialTheme.typography.titleMedium)
-    lot?.address?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-    Text(stringResource(R.string.check_in_spot, reservation.spotCode))
-    Text(
-        stringResource(
-            R.string.check_in_slot,
-            TIME.format(reservation.arrivesAt),
-            TIME.format(reservation.endsAt),
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = stringResource(R.string.check_in_title),
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+        )
+        ReservationStatusBadge(reservation.status)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
-    )
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = lot?.name ?: stringResource(R.string.check_in_unknown_lot),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                lot?.address?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DirectionsCar,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = stringResource(R.string.check_in_spot, reservation.spotCode),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.check_in_slot,
+                        TIME.format(reservation.arrivesAt),
+                        TIME.format(reservation.endsAt),
+                    ),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -132,85 +221,217 @@ private fun CheckIn(
 ) {
     val left = state.toleranceLeft(now)
     val opensAt = state.checkInOpensAt
-    if (opensAt != null && state.isTooEarly(now)) {
-        // Sin esto, el botón aparece gris y "te quedan 11 h" se lee como si ya se pudiera.
-        Text(
-            if (DAY.format(opensAt) == DAY.format(now)) {
-                stringResource(R.string.check_in_too_early_today, TIME.format(opensAt))
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (opensAt != null && state.isTooEarly(now)) {
+                // Sin esto, el botón aparece gris y "te quedan 11 h" se lee como si ya se pudiera.
+                Text(
+                    text = if (DAY.format(opensAt) == DAY.format(now)) {
+                        stringResource(R.string.check_in_too_early_today, TIME.format(opensAt))
+                    } else {
+                        stringResource(R.string.check_in_too_early_other_day, DAY.format(opensAt), TIME.format(opensAt))
+                    },
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else if (left.isZero) {
+                Text(
+                    text = stringResource(R.string.check_in_tolerance_over),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.error,
+                )
             } else {
-                stringResource(R.string.check_in_too_early_other_day, DAY.format(opensAt), TIME.format(opensAt))
-            },
-        )
-    } else if (left.isZero) {
-        Text(stringResource(R.string.check_in_tolerance_over), color = MaterialTheme.colorScheme.error)
-    } else {
-        Text(stringResource(R.string.check_in_tolerance_left, format(left)))
+                Text(
+                    text = stringResource(R.string.check_in_tolerance_left, format(left)),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Text(
+                text = stringResource(R.string.check_in_location_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 
     if (state.spotTaken) {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.check_in_spot_taken_title), style = MaterialTheme.typography.titleSmall)
-                Text(stringResource(R.string.check_in_spot_taken_body))
-                Button(
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = stringResource(R.string.check_in_spot_taken_title),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(R.string.check_in_spot_taken_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
                     onClick = onRequestAnotherSpot,
                     enabled = !state.working,
+                    shape = CircleShape,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(stringResource(R.string.check_in_request_another_spot))
+                    Text(
+                        text = stringResource(R.string.check_in_request_another_spot),
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    )
                 }
             }
         }
     }
 
-    Button(
+    PrimaryButton(
+        text = stringResource(if (state.working) R.string.check_in_working else R.string.check_in_action),
         onClick = onCheckIn,
         enabled = state.canCheckIn(now),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(stringResource(if (state.working) R.string.check_in_working else R.string.check_in_action))
-    }
-    Text(
-        stringResource(R.string.check_in_location_hint),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        loading = state.working,
     )
 }
 
 @Composable
 private fun Stay(state: CheckInState, reservation: Reservation, onCheckOut: () -> Unit) {
-    Text(stringResource(R.string.check_in_done_title), style = MaterialTheme.typography.titleMedium)
-    Text(
-        if (state.spotConfirmed) {
-            stringResource(R.string.check_in_spot_confirmed)
-        } else {
-            stringResource(R.string.check_in_spot_waiting)
-        },
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Text(stringResource(R.string.check_out_until, TIME.format(reservation.endsAt)))
+    val statusColors = SensorParkTheme.colors
+    val sensorColor = if (state.spotConfirmed) statusColors.positive else statusColors.warning
 
-    Button(onClick = onCheckOut, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(if (state.working) R.string.check_in_working else R.string.check_out_action))
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.check_in_done_title),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            )
+            Surface(
+                color = sensorColor.container,
+                contentColor = sensorColor.content,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, sensorColor.content.copy(alpha = 0.3f)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = if (state.spotConfirmed) {
+                        stringResource(R.string.check_in_spot_confirmed)
+                    } else {
+                        stringResource(R.string.check_in_spot_waiting)
+                    },
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                )
+            }
+            Text(
+                text = stringResource(R.string.check_out_until, TIME.format(reservation.endsAt)),
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
+
+    PrimaryButton(
+        text = stringResource(if (state.working) R.string.check_in_working else R.string.check_out_action),
+        onClick = onCheckOut,
+        enabled = !state.working,
+        loading = state.working,
+    )
 }
 
 @Composable
 private fun Summary(summary: CheckOutSummary, reservation: Reservation) {
-    Text(stringResource(R.string.check_out_summary_title), style = MaterialTheme.typography.titleMedium)
-    Text(stringResource(R.string.check_out_summary_stay, summary.stayMinutes, reservation.durationMinutes))
-    // Formato argentino: "$2.500".
-    Text(stringResource(R.string.check_out_summary_amount, formatAmount(summary.amount)))
-    if (summary.stayMinutes > reservation.durationMinutes) {
-        Text(stringResource(R.string.check_out_summary_overstay), color = MaterialTheme.colorScheme.error)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.check_out_summary_title),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            )
+            Text(
+                text = stringResource(R.string.check_out_summary_stay, summary.stayMinutes, reservation.durationMinutes),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            // Formato argentino: "$2.500".
+            Text(
+                text = stringResource(R.string.check_out_summary_amount, formatAmount(summary.amount)),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+            )
+            if (summary.stayMinutes > reservation.durationMinutes) {
+                Text(
+                    text = stringResource(R.string.check_out_summary_overstay),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun Message(message: CheckInMessage, onDismiss: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(message.text()))
+    val isInfo = message == CheckInMessage.SPOT_REASSIGNED
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isInfo) {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            } else {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
+            },
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isInfo) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+            } else {
+                MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+            },
+        ),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = stringResource(message.text()),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.check_in_dismiss)) }
         }
     }
