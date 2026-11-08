@@ -48,7 +48,7 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
-import com.sensorpark.core.ui.components.AvailabilityBadge
+import com.sensorpark.core.ui.components.AvailabilityBadgeWithTotal
 import com.sensorpark.core.ui.components.FavoriteButton
 import com.sensorpark.core.ui.components.formatDistance
 import com.sensorpark.core.ui.theme.SensorParkTheme
@@ -56,6 +56,7 @@ import com.sensorpark.domain.geo.distanceMeters
 import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.NearbyParkingLot
 import com.sensorpark.domain.model.ParkingLot
+import com.sensorpark.domain.model.SpotType
 import com.sensorpark.core.ui.R as CoreR
 
 private const val ZOOM = 14f
@@ -65,11 +66,17 @@ private const val MOVE_THRESHOLD_METERS = 300.0
 
 private fun Coordinates.toLatLng() = LatLng(latitude, longitude)
 
+private fun ParkingLot.freeFor(type: SpotType?) = if (type == null) freeSpots else freeSpotsOf(type)
+
+private fun ParkingLot.capacityFor(type: SpotType?) = if (type == null) capacity else capacityOf(type)
+
 /** Mapa de la pestaña Buscar. Si se arrastra lejos del origen, ofrece buscar en esa zona. */
 @Composable
 internal fun ParkingLotMap(
     origin: Origin,
     lots: List<NearbyParkingLot>,
+    /** Filtro de tipo elegido: si hay uno, los números muestran sólo los lugares de ese tipo. */
+    spotType: SpotType?,
     selectedId: String?,
     favoriteIds: Set<String>,
     myLocationEnabled: Boolean,
@@ -129,7 +136,7 @@ internal fun ParkingLotMap(
                     val isSelected = lot.id == selectedId
                     Marker(
                         state = rememberMarkerState(key = lot.id, position = lot.location.toLatLng()),
-                        icon = icons.icon(lot.freeSpots, lot.capacity, isSelected),
+                        icon = icons.icon(lot.freeFor(spotType), lot.capacityFor(spotType), isSelected),
                         title = lot.name,
                         zIndex = if (isSelected) 1f else 0f,
                         anchor = Offset(0.5f, 0.5f),
@@ -215,7 +222,7 @@ internal fun ParkingLotMap(
                                 parkingLotName = lot.name,
                                 onToggle = { onToggleFavorite(lot.id) },
                             )
-                            AvailabilityBadge(lot.freeSpots, lot.capacity)
+                            AvailabilityBadgeWithTotal(lot.freeFor(spotType), lot.capacityFor(spotType), spotType, lot.freeSpots)
                         }
                         Text(
                             text = "${formatDistance(distance)} · ${lot.address}",

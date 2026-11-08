@@ -142,7 +142,11 @@ fun MapScreen(
                 is DataResult.Success -> when (viewMode) {
                     ViewMode.MAP -> ParkingLotMap(
                         origin = origin,
-                        lots = current.value,
+                        // Con un filtro de tipo, en el mapa no se muestran los que no tienen ninguno libre.
+                        lots = filter.spotType?.let { type ->
+                            current.value.filter { it.parkingLot.freeSpotsOf(type) > 0 }
+                        } ?: current.value,
+                        spotType = filter.spotType,
                         selectedId = selectedId,
                         favoriteIds = favoriteIds,
                         myLocationEnabled = access == LocationAccess.GRANTED,
@@ -304,12 +308,11 @@ private fun ParkingLotList(
             ParkingLotCard(
                 name = lot.name,
                 subtitle = "${formatDistance(distance)} · ${lot.address}",
-                freeSpots = lot.freeSpots,
-                capacity = lot.capacity,
+                freeSpots = spotType?.let { lot.freeSpotsOf(it) } ?: lot.freeSpots,
+                capacity = spotType?.let { lot.capacityOf(it) } ?: lot.capacity,
                 onClick = { open.value(lot.id) },
-                footer = spotType?.let {
-                    stringResource(R.string.nearby_free_of_type, it.label(), lot.freeSpotsOf(it), lot.capacityOf(it))
-                },
+                spotType = spotType,
+                totalFree = lot.freeSpots,
                 favorite = lot.id in favoriteIds,
                 onToggleFavorite = { toggle.value(lot.id) },
                 onDirections = { directions.value(lot) },

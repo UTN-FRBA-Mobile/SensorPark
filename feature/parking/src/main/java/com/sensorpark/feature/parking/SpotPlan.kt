@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,6 +33,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import com.sensorpark.core.ui.components.SpotStatusChip
@@ -47,6 +47,7 @@ import com.sensorpark.domain.model.SpotStatus
 import com.sensorpark.domain.model.SpotType
 
 private val SpotCellShape = RoundedCornerShape(12.dp)
+private val LabelLineHeight = 11.sp
 private val ArLocale = Locale.forLanguageTag("es-AR")
 
 /** Un lugar como lo dibuja el plano. Es inmutable para que Compose se saltee las celdas sin cambios. */
@@ -110,9 +111,11 @@ internal fun SpotCellView(cell: SpotCell, onReserve: (SpotCell) -> Unit, modifie
                     onClick = { onReserve(cell) },
                 )
                 .semantics(mergeDescendants = true) { contentDescription = description }
-                .padding(4.dp),
+                .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+            // Arriba y no centrado: el tic, el número y la primera línea de la etiqueta quedan a la
+            // misma altura en todas las celdas, y si la etiqueta no entra sigue hacia abajo.
+            verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.Top),
         ) {
             Icon(cell.status.icon(), contentDescription = null, modifier = Modifier.size(16.dp))
             Text(
@@ -122,19 +125,15 @@ internal fun SpotCellView(cell: SpotCell, onReserve: (SpotCell) -> Unit, modifie
                 maxLines = 1,
             )
             val typeIcon = cell.type.icon()
-            if (typeIcon != null || categoryLabel != null) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    if (typeIcon != null) Icon(typeIcon, contentDescription = null, modifier = Modifier.size(14.dp))
-                    if (categoryLabel != null) {
-                        Text(
-                            text = categoryLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = color.content,
-                            maxLines = 1,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
+            // El ícono del tipo en su propia línea y, debajo, la aclaración de la categoría.
+            if (typeIcon != null) Icon(typeIcon, contentDescription = null, modifier = Modifier.size(14.dp))
+            if (categoryLabel != null) {
+                Text(
+                    text = categoryLabel,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = LabelLineHeight),
+                    color = color.content,
+                    textAlign = TextAlign.Center,
+                )
             }
         }
     }
