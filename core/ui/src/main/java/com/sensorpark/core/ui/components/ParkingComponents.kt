@@ -23,11 +23,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.automirrored.filled.Accessible
+import androidx.compose.material.icons.filled.EvStation
+import androidx.compose.material.icons.filled.TwoWheeler
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -79,7 +84,7 @@ fun availabilityColor(free: Int, capacity: Int, colors: SensorParkColors): Statu
 
 /** Pastilla con los lugares libres, del color de [availabilityColor]. */
 @Composable
-fun AvailabilityBadge(free: Int, capacity: Int, modifier: Modifier = Modifier) {
+fun AvailabilityBadge(free: Int, capacity: Int, modifier: Modifier = Modifier, spotType: SpotType? = null) {
     val status = availabilityColor(free, capacity, SensorParkTheme.colors)
     Surface(
         color = status.container,
@@ -88,13 +93,51 @@ fun AvailabilityBadge(free: Int, capacity: Int, modifier: Modifier = Modifier) {
         border = BorderStroke(1.dp, status.content.copy(alpha = 0.3f)),
         modifier = modifier,
     ) {
-        Text(
-            text = if (free <= 0) stringResource(R.string.availability_full)
-            else stringResource(R.string.availability_free, free, capacity),
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+        Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (spotType != null && spotType != SpotType.STANDARD) {
+                Icon(spotTypeIcon(spotType), contentDescription = null, modifier = Modifier.size(14.dp))
+            }
+            Text(
+                text = when {
+                    free <= 0 -> stringResource(R.string.availability_full)
+                    spotType == SpotType.PRIORITY -> stringResource(R.string.availability_free_priority, free, capacity)
+                    spotType == SpotType.MOTORCYCLE -> stringResource(R.string.availability_free_motorcycle, free, capacity)
+                    spotType == SpotType.EV_CHARGING -> stringResource(R.string.availability_free_ev, free, capacity)
+                    else -> stringResource(R.string.availability_free, free, capacity)
+                },
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            )
+        }
     }
+}
+
+/**
+ * [AvailabilityBadge] con, debajo, los libres totales cuando hay un filtro de tipo y el total
+ * es mayor que los libres de ese tipo.
+ */
+@Composable
+fun AvailabilityBadgeWithTotal(free: Int, capacity: Int, spotType: SpotType?, totalFree: Int) {
+    Column(horizontalAlignment = Alignment.End) {
+        AvailabilityBadge(free, capacity, spotType = spotType)
+        if (spotType != null && totalFree > free) {
+            Text(
+                text = stringResource(R.string.availability_total_free, totalFree),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 11.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
+}
+
+private fun spotTypeIcon(type: SpotType) = when (type) {
+    SpotType.PRIORITY -> Icons.AutoMirrored.Filled.Accessible
+    SpotType.MOTORCYCLE -> Icons.Filled.TwoWheeler
+    else -> Icons.Filled.EvStation
 }
 
 /**
@@ -114,6 +157,8 @@ fun ParkingLotCard(
     favorite: Boolean? = null,
     onToggleFavorite: () -> Unit = {},
     onDirections: (() -> Unit)? = null,
+    spotType: SpotType? = null,
+    totalFree: Int = freeSpots,
 ) {
     Card(
         onClick = onClick,
@@ -137,7 +182,7 @@ fun ParkingLotCard(
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
                 if (favorite != null) FavoriteButton(favorite, name, onToggleFavorite)
-                AvailabilityBadge(freeSpots, capacity)
+                AvailabilityBadgeWithTotal(freeSpots, capacity, spotType, totalFree)
             }
             Text(
                 text = subtitle,
