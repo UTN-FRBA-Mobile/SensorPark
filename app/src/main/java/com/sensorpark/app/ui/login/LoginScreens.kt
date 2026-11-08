@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -95,7 +96,27 @@ fun SignUpScreen(onBack: () -> Unit, vm: AuthViewModel = hiltViewModel()) {
     var role by rememberSaveable { mutableStateOf(Role.DRIVER) }
     var category by rememberSaveable { mutableStateOf(Category.STANDARD) }
 
-    AuthForm(isSignUp = true, state = state) {
+    AuthForm(
+        isSignUp = true,
+        state = state,
+        actions = {
+            PrimaryButton(
+                text = stringResource(R.string.sign_up_button),
+                onClick = {
+                    vm.signUp(name, email, password, role, if (role == Role.DRIVER) category else Category.STANDARD)
+                },
+                enabled = name.isNotBlank() && email.isNotBlank() && password.isNotEmpty(),
+                loading = state.loading,
+            )
+            TextButton(onClick = onBack) {
+                Text(
+                    text = stringResource(R.string.sign_up_have_account),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
+    ) {
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
@@ -111,38 +132,31 @@ fun SignUpScreen(onBack: () -> Unit, vm: AuthViewModel = hiltViewModel()) {
         if (role == Role.DRIVER) {
             CategorySelector(selected = category, onSelect = { category = it }, enabled = !state.loading)
         }
-        Spacer(Modifier.height(4.dp))
-        PrimaryButton(
-            text = stringResource(R.string.sign_up_button),
-            onClick = {
-                vm.signUp(name, email, password, role, if (role == Role.DRIVER) category else Category.STANDARD)
-            },
-            enabled = name.isNotBlank() && email.isNotBlank() && password.isNotEmpty(),
-            loading = state.loading,
-        )
-        TextButton(onClick = onBack) {
-            Text(
-                text = stringResource(R.string.sign_up_have_account),
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
     }
 }
 
 @Composable
-private fun AuthForm(isSignUp: Boolean, state: AuthUiState, fields: @Composable () -> Unit) {
+private fun AuthForm(
+    isSignUp: Boolean,
+    state: AuthUiState,
+    actions: (@Composable ColumnScope.() -> Unit)? = null,
+    fields: @Composable () -> Unit,
+) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
+      Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
+                .fillMaxWidth()
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(
+                14.dp,
+                if (actions != null) Alignment.Top else Alignment.CenterVertically,
+            ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
@@ -208,6 +222,17 @@ private fun AuthForm(isSignUp: Boolean, state: AuthUiState, fields: @Composable 
                 }
             }
         }
+        if (actions != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, bottom = 16.dp, top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                content = actions,
+            )
+        }
+      }
     }
 }
 
