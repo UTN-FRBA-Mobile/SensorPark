@@ -35,3 +35,17 @@ data class ParkingLot(
 
 /** Resultado de una búsqueda por cercanía: el estacionamiento y a cuántos metros está. */
 data class NearbyParkingLot(val parkingLot: ParkingLot, val distanceMeters: Double)
+
+/**
+ * Un piso o nivel del estacionamiento con la imagen de su plano (por ejemplo, "Planta Baja" o
+ * "1° Subsuelo"). Se guarda en la subcolección `levels` para no descargar imágenes al listar
+ * estacionamientos.
+ */
+data class ParkingLevel(
+    val id: String,
+    val name: String,
+    val order: Int = 0,
+    val imageBase64: String,
+    val imageWidth: Int,
+    val imageHeight: Int,
+)

@@ -3,9 +3,11 @@ package com.sensorpark.data.firebase
 import com.google.firebase.firestore.GeoPoint
 import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.Coordinates
+import com.sensorpark.domain.model.ParkingLevel
 import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.model.Schedule
 import com.sensorpark.domain.model.Spot
+import com.sensorpark.domain.model.SpotPlanPosition
 import com.sensorpark.domain.model.SpotStatus
 import com.sensorpark.domain.model.SpotType
 import java.time.LocalTime
@@ -40,14 +42,42 @@ internal fun parkingLotFrom(id: String, data: Map<String, Any?>): ParkingLot? {
 internal fun spotFrom(id: String, data: Map<String, Any?>): Spot? {
     val type = SpotType.from(data[SpotFields.TYPE]) ?: return null
     val status = SpotStatus.from(data[SpotFields.STATUS]) ?: return null
+    val levelId = (data[SpotFields.LEVEL_ID] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+    val planX = float(data[SpotFields.PLAN_X])
+    val planY = float(data[SpotFields.PLAN_Y])
+    val planPosition = if (levelId != null && planX != null && planY != null && planX in 0f..1f && planY in 0f..1f) {
+        SpotPlanPosition(levelId = levelId, x = planX, y = planY)
+    } else {
+        null
+    }
     return Spot(
         id = id,
         code = data[SpotFields.CODE] as? String ?: id,
         type = type,
         status = status,
         priorityCategory = (data[SpotFields.PRIORITY_CATEGORY] as? String)?.let { Category.from(it) },
+        planPosition = planPosition,
     )
 }
+
+/** Un piso o nivel del plano de un estacionamiento. Sin nombre, imagen o dimensiones válidas, se descarta. */
+internal fun parkingLevelFrom(id: String, data: Map<String, Any?>): ParkingLevel? {
+    val name = (data[LevelFields.NAME] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val imageBase64 = (data[LevelFields.IMAGE_BASE64] as? String)?.takeIf { it.isNotBlank() } ?: return null
+    val width = int(data[LevelFields.IMAGE_WIDTH])
+    val height = int(data[LevelFields.IMAGE_HEIGHT])
+    if (width <= 0 || height <= 0) return null
+    return ParkingLevel(
+        id = id,
+        name = name,
+        order = int(data[LevelFields.ORDER]),
+        imageBase64 = imageBase64,
+        imageWidth = width,
+        imageHeight = height,
+    )
+}
+
+private fun float(value: Any?): Float? = (value as? Number)?.toFloat()?.takeIf { it.isFinite() }
 
 private fun scheduleFrom(value: Any?): Schedule? {
     val map = value as? Map<*, *> ?: return null

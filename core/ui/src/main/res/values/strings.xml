@@ -65,5 +65,7 @@
     <string name="rejection_offer_expired">Se pasaron los 5 minutos: el lugar pasó al siguiente de la fila.</string>
     <string name="rejection_spot_has_reservation">El lugar tiene una reserva activa o se lo está guardando la lista de espera. Probá cuando se libere.</string>
     <string name="favorite_add">Guardar %1$s en favoritos</string>
-    <string name="favorite_remove">Sacar %1$s de favoritos</string>
+    <string name="favorite_remove">Sacar %1$s en favoritos</string>
+    <string name="plan_spot_content_description">Lugar %1$s, %2$s</string>
+    <string name="plan_reset_zoom">1x</string>
 </resources>

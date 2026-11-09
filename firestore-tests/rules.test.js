@@ -215,6 +215,17 @@ describe("lugares", () => {
     await assertFails(getDoc(doc(driver("ana"), "parkingLots/e1/quotas/2026-11-02")));
     await assertFails(setDoc(doc(parkingAdmin("encargado"), "parkingLots/e1/quotas/2026-11-03"), { PREGNANT: 20 }));
   });
+
+  test("el encargado sube y edita planos por piso, y cualquier autenticado los ve", async () => {
+    await assertSucceeds(setDoc(
+      doc(parkingAdmin("encargado"), "parkingLots/e1/levels/pb"),
+      { name: "Planta Baja", order: 1, imageBase64: "abc", imageWidth: 800, imageHeight: 500 },
+    ));
+    await assertSucceeds(getDoc(doc(driver("ana"), "parkingLots/e1/levels/pb")));
+    await assertFails(getDoc(doc(anonymous(), "parkingLots/e1/levels/pb")));
+    await assertFails(setDoc(doc(driver("ana"), "parkingLots/e1/levels/pb"), { name: "PB" }));
+    await assertFails(setDoc(doc(parkingAdmin("otro"), "parkingLots/e1/levels/pb"), { name: "PB" }));
+  });
 });
 
 describe("reservas", () => {

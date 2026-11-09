@@ -8,6 +8,9 @@ object Collections {
     /** Subcolección de cada estacionamiento: sus lugares. */
     const val SPOTS = "spots"
 
+    /** Subcolección de cada estacionamiento: los pisos o niveles con la imagen de su plano. */
+    const val LEVELS = "levels"
+
     const val RESERVATIONS = "reservations"
     const val WAITLIST = "waitlist"
 
@@ -70,7 +73,20 @@ object SpotFields {
 
     /** Sólo en lugares PRIORITY: la categoría que puede usarlo. */
     const val PRIORITY_CATEGORY = "priorityCategory"
+
+    /** Piso y coordenadas relativas (`0.0` a `1.0`) donde está marcado el lugar en el plano. */
+    const val LEVEL_ID = "levelId"
+    const val PLAN_X = "planX"
+    const val PLAN_Y = "planY"
     const val UPDATED_AT = "updatedAt"
+}
+
+object LevelFields {
+    const val NAME = "name"
+    const val ORDER = "order"
+    const val IMAGE_BASE64 = "imageBase64"
+    const val IMAGE_WIDTH = "imageWidth"
+    const val IMAGE_HEIGHT = "imageHeight"
 }
 
 /** Campos de `reservations/{id}`. Las escriben sólo las functions; ver docs/reservation-rules.md. */

@@ -12,10 +12,14 @@ import androidx.compose.ui.test.performScrollTo
 import com.sensorpark.core.testing.FakeFavoritesRepository
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeSpotAvailabilityRepository
+import com.sensorpark.core.testing.FakeUserRepository
 import com.sensorpark.core.testing.Samples
 import com.sensorpark.core.ui.theme.SensorParkTheme
+import com.sensorpark.domain.model.Category
+import com.sensorpark.domain.model.ParkingLevel
 import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.model.SpotAvailability
+import com.sensorpark.domain.model.SpotPlanPosition
 import com.sensorpark.domain.model.SpotStatus
 import com.sensorpark.domain.model.SpotType
 import org.junit.Assert.assertEquals
@@ -34,6 +38,7 @@ class ParkingLotDetailScreenUiTest {
     private fun ComposeContentTestRule.show(
         spots: FakeSpotAvailabilityRepository = FakeSpotAvailabilityRepository(),
         lot: com.sensorpark.domain.model.ParkingLot = Samples.UTN_MEDRANO,
+        userCategory: Category = Category.STANDARD,
         onReserve: (String) -> Unit = {},
         onReserveSpot: (String, Spot) -> Unit = { _, _ -> },
     ) = setContent {
@@ -42,7 +47,11 @@ class ParkingLotDetailScreenUiTest {
                 parkingLotId = lot.id,
                 onReserve = onReserve,
                 onReserveSpot = onReserveSpot,
-                vm = ParkingLotDetailViewModel(FakeParkingLotRepository(listOf(lot)), FakeFavoritesRepository()),
+                vm = ParkingLotDetailViewModel(
+                    FakeParkingLotRepository(listOf(lot)),
+                    FakeFavoritesRepository(),
+                    FakeUserRepository(userCategory),
+                ),
                 spotsVm = SpotAvailabilityViewModel(spots),
             )
         }
@@ -117,5 +126,29 @@ class ParkingLotDetailScreenUiTest {
         // Vuelve la red: Firestore reconecta solo y entrega los datos del servidor.
         spots.emit(plan(Samples.spot("01"), isFromCache = false))
         compose.onNodeWithText("En vivo").assertExists()
+    }
+
+    @Test
+    fun sinPlanoCargadoInformaAlUsuarioYConPlanoPermiteAlternarConLaGrilla() {
+        val spots = FakeSpotAvailabilityRepository(
+            availability = plan(
+                Samples.spot("01").copy(planPosition = SpotPlanPosition("main", 0.3f, 0.4f)),
+            ),
+        )
+        compose.show(spots)
+
+        compose.onNodeWithText(
+            "El administrador aún no cargó el plano de este estacionamiento. Podés elegir tu lugar desde la grilla.",
+        ).assertExists()
+
+        // Cuando el estacionamiento tiene su plano cargado, permite alternar entre Plano y Grilla.
+        spots.emitLevels(
+            listOf(
+                ParkingLevel("main", "Plano", 1, "img", 320, 200),
+            ),
+        )
+        compose.onNodeWithText("Plano").assertExists()
+        compose.onNodeWithText("Grilla").performClick()
+        compose.onNodeWithContentDescription("Lugar 01, libre").assertExists()
     }
 }

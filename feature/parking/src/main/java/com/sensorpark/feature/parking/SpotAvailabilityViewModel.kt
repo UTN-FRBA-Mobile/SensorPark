@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sensorpark.domain.model.DataErrorReason
 import com.sensorpark.domain.model.DataResult
+import com.sensorpark.domain.model.ParkingLevel
 import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.model.SpotAvailability
 import com.sensorpark.domain.repository.SpotAvailabilityRepository
@@ -12,6 +13,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -72,6 +74,15 @@ class SpotAvailabilityViewModel @Inject constructor(
                 .onStart { if (loadedId != current.id) emit(SpotAvailabilityState.Loading) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpotAvailabilityState.Loading)
+
+    /** Los pisos o niveles con plano cargado de este estacionamiento, ordenados por `order`. */
+    val levels: StateFlow<List<ParkingLevel>> = request.filterNotNull()
+        .flatMapLatest { current ->
+            repository.observeLevels(current.id)
+                .map { (it as? DataResult.Success)?.value.orEmpty() }
+                .catch { emit(emptyList()) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun load(parkingLotId: String) = request.update { if (it?.id == parkingLotId) it else Request(parkingLotId) }
 

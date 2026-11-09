@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.sensorpark.domain.model.DataErrorReason
 import com.sensorpark.domain.model.DataResult
 import com.sensorpark.domain.model.DaySummary
+import com.sensorpark.domain.model.ParkingLevel
+import com.sensorpark.domain.model.ParkingLevelDraft
 import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationOutcome
@@ -12,8 +14,10 @@ import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.model.SpotAvailability
 import com.sensorpark.domain.model.SpotDraft
+import com.sensorpark.domain.model.SpotPlanPosition
 import com.sensorpark.domain.model.SpotStatus
 import com.sensorpark.domain.model.hourlyOccupancy
+import com.sensorpark.domain.model.sanitizeSpotPositions
 import com.sensorpark.domain.repository.ParkingLotAdminRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
 import com.sensorpark.domain.repository.SpotAvailabilityRepository
@@ -37,11 +41,13 @@ import kotlinx.coroutines.launch
 import java.time.Clock
 import javax.inject.Inject
 
-/** Qué pasó con la última acción sobre un lugar. */
+/** Qué pasó con la última acción sobre un lugar o sobre el plano. */
 data class SpotAction(
     val working: Boolean = false,
+    val savedPositions: Boolean = false,
     val rejection: ReservationRejection? = null,
     val failure: DataErrorReason? = null,
+    val planFailure: DataErrorReason? = null,
 )
 
 /**
@@ -85,6 +91,15 @@ class ParkingLotPanelViewModel @Inject constructor(
                 .onStart { if (loadedSpotsId != request.id) emit(null) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Los pisos o niveles del plano del estacionamiento, ordenados por `order`. */
+    val levels: StateFlow<List<ParkingLevel>> = request.filterNotNull()
+        .flatMapLatest { request ->
+            spotsRepository.observeLevels(request.id)
+                .map { (it as? DataResult.Success)?.value.orEmpty() }
+                .catch { emit(emptyList()) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Las reservas de hoy (desde las 0 hasta las 24, hora argentina). */
     private val today: StateFlow<List<Reservation>> = request.filterNotNull()
@@ -137,6 +152,36 @@ class ParkingLotPanelViewModel @Inject constructor(
     fun delete(spot: Spot) = act {
         val id = request.value?.id ?: return@act SpotAction()
         outcome(admin.deleteSpot(id, spot.id))
+    }
+
+    /** Crea o actualiza el plano del estacionamiento. [onSaved] recibe el id del plano guardado. */
+    fun saveLevel(draft: ParkingLevelDraft, onSaved: (String) -> Unit) = act {
+        val id = request.value?.id ?: return@act SpotAction()
+        when (val result = admin.saveLevel(id, draft)) {
+            is DataResult.Success -> SpotAction().also { onSaved(result.value) }
+            is DataResult.Failure -> SpotAction(planFailure = result.reason)
+        }
+    }
+
+    /** Borra el plano y devuelve sus lugares a la lista de pendientes de ubicar. */
+    fun deleteLevel(levelId: String, onDeleted: () -> Unit = {}) = act {
+        val id = request.value?.id ?: return@act SpotAction()
+        when (val result = admin.deleteLevel(id, levelId)) {
+            is DataResult.Success -> SpotAction().also { onDeleted() }
+            is DataResult.Failure -> SpotAction(planFailure = result.reason)
+        }
+    }
+
+    /** Guarda en lote las posiciones de los lugares en el plano, validando consistencia 1 a 1. */
+    fun saveSpotPositions(positions: Map<String, SpotPlanPosition?>, onSaved: () -> Unit = {}) = act {
+        val id = request.value?.id ?: return@act SpotAction()
+        val currentSpots = spots.value.orEmpty()
+        val currentLevels = levels.value
+        val sanitized = sanitizeSpotPositions(currentSpots, currentLevels, positions)
+        when (val result = admin.saveSpotPositions(id, sanitized)) {
+            is DataResult.Success -> SpotAction(savedPositions = true).also { onSaved() }
+            is DataResult.Failure -> SpotAction(planFailure = result.reason)
+        }
     }
 
     private fun outcome(result: ReservationOutcome<Unit>) = when (result) {

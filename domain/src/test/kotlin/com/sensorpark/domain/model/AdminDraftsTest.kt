@@ -110,4 +110,56 @@ class AdminDraftsTest {
             summary,
         )
     }
+
+    @Test
+    fun `un piso del plano pide leyenda propia e imagen valida`() {
+        assertEquals(
+            setOf(LevelProblem.NAME_REQUIRED, LevelProblem.IMAGE_REQUIRED),
+            ParkingLevelDraft(name = " ", imageBase64 = "").problems(emptySet()),
+        )
+        assertEquals(
+            setOf(LevelProblem.NAME_TAKEN),
+            ParkingLevelDraft(name = "Planta Baja", imageBase64 = "abc", imageWidth = 300, imageHeight = 200)
+                .problems(setOf("planta baja")),
+        )
+        assertTrue(
+            ParkingLevelDraft(name = "1° Subsuelo", imageBase64 = "abc", imageWidth = 300, imageHeight = 200)
+                .problems(setOf("Planta Baja"))
+                .isEmpty(),
+        )
+    }
+
+    @Test
+    fun `la particion y limpieza del plano mantienen consistencia 1 a 1 con los lugares reales`() {
+        val pb = ParkingLevel("pb", "Planta Baja", 1, "img", 320, 200)
+        val sub = ParkingLevel("sub", "1° Subsuelo", 2, "img", 320, 200)
+        val levels = listOf(pb, sub)
+        val spots = listOf(
+            Spot("01", "01", SpotType.STANDARD, SpotStatus.FREE, planPosition = SpotPlanPosition("pb", 0.2f, 0.3f)),
+            Spot("02", "02", SpotType.STANDARD, SpotStatus.FREE, planPosition = SpotPlanPosition("sub", 0.5f, 0.5f)),
+            Spot("03", "03", SpotType.STANDARD, SpotStatus.FREE, planPosition = SpotPlanPosition("piso-borrado", 0.4f, 0.4f)),
+            Spot("04", "04", SpotType.STANDARD, SpotStatus.FREE),
+        )
+
+        val initial = partitionSpotsForLevel(spots, levels, currentLevelId = "pb")
+        assertEquals(listOf("01"), initial.onCurrentLevel.map { it.code })
+        assertEquals(listOf("03", "04"), initial.unplaced.map { it.code })
+        assertEquals(listOf("02" to "1° Subsuelo"), initial.onOtherLevels.map { it.first.code to it.second.name })
+
+        // Mover el 02 a Planta Baja y quitar el 01 del plano mantiene exactamente los 4 lugares sin duplicar.
+        val overrides = mapOf(
+            "01" to null,
+            "02" to SpotPlanPosition("pb", 0.7f, 0.8f),
+            "fantasma-99" to SpotPlanPosition("pb", 0.1f, 0.1f),
+        )
+        val updated = partitionSpotsForLevel(spots, levels, currentLevelId = "pb", overrides = overrides)
+        assertEquals(listOf("02"), updated.onCurrentLevel.map { it.code })
+        assertEquals(listOf("01", "03", "04"), updated.unplaced.map { it.code })
+        assertTrue(updated.onOtherLevels.isEmpty())
+
+        val sanitized = sanitizeSpotPositions(spots, levels, overrides)
+        assertEquals(setOf("01", "02"), sanitized.keys)
+        assertEquals(null, sanitized["01"])
+        assertEquals(SpotPlanPosition("pb", 0.7f, 0.8f), sanitized["02"])
+    }
 }

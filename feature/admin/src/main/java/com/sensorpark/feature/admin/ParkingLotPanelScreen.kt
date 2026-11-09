@@ -73,6 +73,7 @@ import com.sensorpark.domain.model.SpotType
 
 private enum class PanelTab(val title: Int) {
     SPOTS(R.string.admin_panel_tab_spots),
+    PLAN(R.string.admin_panel_tab_plan),
     TODAY(R.string.admin_panel_tab_today),
     DETAILS(R.string.admin_panel_tab_details),
 }
@@ -124,7 +125,10 @@ private fun Panel(lot: ParkingLot, vm: ParkingLotPanelViewModel, formVm: Parking
                 val isSelected = selected == index
                 Tab(
                     selected = isSelected,
-                    onClick = { selected = index },
+                    onClick = {
+                        if (!isSelected) vm.dismissError()
+                        selected = index
+                    },
                     text = {
                         Text(
                             text = stringResource(tab.title),
@@ -136,6 +140,7 @@ private fun Panel(lot: ParkingLot, vm: ParkingLotPanelViewModel, formVm: Parking
         }
         when (PanelTab.entries[selected]) {
             PanelTab.SPOTS -> SpotsTab(vm)
+            PanelTab.PLAN -> PlanTab(vm)
             PanelTab.TODAY -> TodayTab(vm)
             PanelTab.DETAILS -> ParkingLotDetailsTab(lot.id, formVm)
         }
@@ -470,7 +475,7 @@ private fun TodayReservationRow(reservation: Reservation) {
 }
 
 @Composable
-private fun Problem(message: String, onDismiss: () -> Unit) {
+internal fun Problem(message: String, onDismiss: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),

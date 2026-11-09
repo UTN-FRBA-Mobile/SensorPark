@@ -11,11 +11,13 @@ import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.sensorpark.domain.model.DataErrorReason
 import com.sensorpark.domain.model.DataResult
+import com.sensorpark.domain.model.ParkingLevelDraft
 import com.sensorpark.domain.model.ParkingLotDraft
 import com.sensorpark.domain.model.Reservation
 import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.SpotDraft
+import com.sensorpark.domain.model.SpotPlanPosition
 import com.sensorpark.domain.model.SpotStatus
 import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.repository.ParkingLotAdminRepository
@@ -86,6 +88,86 @@ class ParkingLotAdminRepositoryFirebase @Inject constructor(
 
     override suspend fun deleteSpot(parkingLotId: String, spotId: String): ReservationOutcome<Unit> =
         call(DELETE_SPOT, mapOf("parkingLotId" to parkingLotId, "spotId" to spotId))
+
+    override suspend fun saveLevel(parkingLotId: String, draft: ParkingLevelDraft): DataResult<String> = write {
+        val levelsRef = db.collection(Collections.PARKING_LOTS).document(parkingLotId).collection(Collections.LEVELS)
+        val existingDocs = levelsRef.get().await().documents
+        val targetId = draft.id?.takeIf { it.isNotBlank() }
+            ?: existingDocs.firstOrNull()?.id
+            ?: SINGLE_LEVEL_ID
+        val docRef = levelsRef.document(targetId)
+        val fields = mapOf(
+            LevelFields.NAME to draft.name.trim().ifBlank { DEFAULT_PLAN_NAME },
+            LevelFields.ORDER to 1,
+            LevelFields.IMAGE_BASE64 to draft.imageBase64,
+            LevelFields.IMAGE_WIDTH to draft.imageWidth,
+            LevelFields.IMAGE_HEIGHT to draft.imageHeight,
+        )
+        val batch = db.batch()
+        batch.set(docRef, fields)
+        // Garantiza un único plano por estacionamiento borrando cualquier piso extra previo.
+        for (extra in existingDocs) {
+            if (extra.id != targetId) {
+                batch.delete(extra.reference)
+            }
+        }
+        batch.commit().await()
+        DataResult.Success(docRef.id)
+    }
+
+    override suspend fun deleteLevel(parkingLotId: String, levelId: String): DataResult<Unit> = write {
+        val lotRef = db.collection(Collections.PARKING_LOTS).document(parkingLotId)
+        val existingLevels = lotRef.collection(Collections.LEVELS).get().await()
+        val allSpots = lotRef.collection(Collections.SPOTS).get().await()
+        val batch = db.batch()
+        for (levelDoc in existingLevels.documents) {
+            batch.delete(levelDoc.reference)
+        }
+        for (doc in allSpots.documents) {
+            if (doc.contains(SpotFields.LEVEL_ID) || doc.contains(SpotFields.PLAN_X)) {
+                batch.update(
+                    doc.reference,
+                    mapOf(
+                        SpotFields.LEVEL_ID to FieldValue.delete(),
+                        SpotFields.PLAN_X to FieldValue.delete(),
+                        SpotFields.PLAN_Y to FieldValue.delete(),
+                    ),
+                )
+            }
+        }
+        batch.commit().await()
+        DataResult.Success(Unit)
+    }
+
+    override suspend fun saveSpotPositions(
+        parkingLotId: String,
+        positions: Map<String, SpotPlanPosition?>,
+    ): DataResult<Unit> = write {
+        val spotsCollection = db.collection(Collections.PARKING_LOTS).document(parkingLotId).collection(Collections.SPOTS)
+        // Sólo se actualizan lugares que existen realmente en el estacionamiento (consistencia 1 a 1).
+        val existingIds = spotsCollection.get().await().documents.map { it.id }.toSet()
+        val batch = db.batch()
+        for ((spotId, pos) in positions) {
+            if (spotId !in existingIds) continue
+            val ref = spotsCollection.document(spotId)
+            val fields = if (pos != null && pos.isValid) {
+                mapOf(
+                    SpotFields.LEVEL_ID to pos.levelId,
+                    SpotFields.PLAN_X to pos.x.coerceIn(0f, 1f).toDouble(),
+                    SpotFields.PLAN_Y to pos.y.coerceIn(0f, 1f).toDouble(),
+                )
+            } else {
+                mapOf(
+                    SpotFields.LEVEL_ID to FieldValue.delete(),
+                    SpotFields.PLAN_X to FieldValue.delete(),
+                    SpotFields.PLAN_Y to FieldValue.delete(),
+                )
+            }
+            batch.update(ref, fields)
+        }
+        batch.commit().await()
+        DataResult.Success(Unit)
+    }
 
     override fun reservationsBetween(
         parkingLotId: String,
@@ -160,6 +242,8 @@ class ParkingLotAdminRepositoryFirebase @Inject constructor(
     private companion object {
         const val SPOT_SERVICE = "setSpotService"
         const val DELETE_SPOT = "deleteSpot"
+        const val SINGLE_LEVEL_ID = "main"
+        const val DEFAULT_PLAN_NAME = "Plano"
         const val TIMEOUT_MS = 20_000L
         val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     }

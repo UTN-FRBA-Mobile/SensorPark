@@ -2,10 +2,12 @@ package com.sensorpark.feature.parking
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.DataResult
 import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.repository.FavoritesRepository
 import com.sensorpark.domain.repository.ParkingLotRepository
+import com.sensorpark.domain.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +29,7 @@ import javax.inject.Inject
 class ParkingLotDetailViewModel @Inject constructor(
     private val repository: ParkingLotRepository,
     private val favorites: FavoritesRepository,
+    userRepository: UserRepository,
 ) : ViewModel() {
     // El id llega desde la pantalla; un reintento lo vuelve a emitir para suscribirse de nuevo.
     private data class Request(val id: String, val attempt: Int = 0)
@@ -49,6 +52,12 @@ class ParkingLotDetailViewModel @Inject constructor(
         combine(request.filterNotNull(), favorites.favorites().catch { emit(emptySet()) }) { request, ids ->
             request.id in ids
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Categoría de prioridad del conductor actual para habilitar o bloquear lugares preferenciales. */
+    val userCategory: StateFlow<Category> =
+        userRepository.category
+            .catch { emit(Category.STANDARD) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Category.STANDARD)
 
     fun load(id: String) = request.update { if (it?.id == id) it else Request(id) }
 
