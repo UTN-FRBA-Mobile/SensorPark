@@ -10,6 +10,8 @@ import com.sensorpark.domain.model.DataResult
 import com.sensorpark.domain.model.LocationReading
 import com.sensorpark.domain.model.NotificationPreferences
 import com.sensorpark.domain.model.NotificationType
+import com.sensorpark.domain.model.ParkingLevel
+import com.sensorpark.domain.model.ParkingLevelDraft
 import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.model.ParkingLotDraft
 import com.sensorpark.domain.model.Reservation
@@ -19,6 +21,7 @@ import com.sensorpark.domain.model.ReservationRequest
 import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.model.SpotAvailability
 import com.sensorpark.domain.model.SpotDraft
+import com.sensorpark.domain.model.SpotPlanPosition
 import com.sensorpark.domain.model.SpotReassignment
 import com.sensorpark.domain.model.SpotType
 import com.sensorpark.domain.model.Stay
@@ -298,8 +301,10 @@ class FakeParkingLotRepository(lots: List<ParkingLot> = listOf(Samples.UTN_MEDRA
 
 class FakeSpotAvailabilityRepository(
     availability: SpotAvailability = Samples.availability(Samples.spot()),
+    levels: List<ParkingLevel> = emptyList(),
 ) : SpotAvailabilityRepository {
     private val state = MutableStateFlow(availability)
+    private val levelsState = MutableStateFlow(levels)
     val requested = mutableListOf<String>()
 
     /** Como el simulador de sensores: cambia el estado de un lugar y la pantalla se entera sola. */
@@ -307,10 +312,17 @@ class FakeSpotAvailabilityRepository(
         state.value = availability
     }
 
+    fun emitLevels(levels: List<ParkingLevel>) {
+        levelsState.value = levels
+    }
+
     override fun observeSpots(parkingLotId: String): Flow<DataResult<SpotAvailability>> {
         requested += parkingLotId
         return state.map { DataResult.Success(it) }
     }
+
+    override fun observeLevels(parkingLotId: String): Flow<DataResult<List<ParkingLevel>>> =
+        levelsState.map { list -> DataResult.Success(list.sortedWith(compareBy<ParkingLevel> { it.order }.thenBy { it.name })) }
 }
 
 class FakeUserRepository(category: Category = Category.STANDARD) : UserRepository {
@@ -510,10 +522,15 @@ class FakeParkingLotAdminRepository : ParkingLotAdminRepository {
     val savedSpots = mutableListOf<SpotDraft>()
     val serviceChanges = mutableListOf<Pair<String, Boolean>>()
     val deletedSpots = mutableListOf<String>()
+    val savedLevels = mutableListOf<ParkingLevelDraft>()
+    val deletedLevels = mutableListOf<String>()
+    val savedPositions = mutableListOf<Map<String, SpotPlanPosition?>>()
     private val reservations = MutableStateFlow<List<Reservation>>(emptyList())
 
     var createResult: DataResult<String> = DataResult.Success("lot-nuevo")
     var spotResult: ReservationOutcome<Unit> = ReservationOutcome.Success(Unit)
+    var levelResult: DataResult<String> = DataResult.Success("level-1")
+    var positionsResult: DataResult<Unit> = DataResult.Success(Unit)
 
     fun emitReservations(today: List<Reservation>) {
         reservations.value = today
@@ -542,6 +559,24 @@ class FakeParkingLotAdminRepository : ParkingLotAdminRepository {
     override suspend fun deleteSpot(parkingLotId: String, spotId: String): ReservationOutcome<Unit> {
         deletedSpots += spotId
         return spotResult
+    }
+
+    override suspend fun saveLevel(parkingLotId: String, draft: ParkingLevelDraft): DataResult<String> {
+        savedLevels += draft
+        return levelResult
+    }
+
+    override suspend fun deleteLevel(parkingLotId: String, levelId: String): DataResult<Unit> {
+        deletedLevels += levelId
+        return DataResult.Success(Unit)
+    }
+
+    override suspend fun saveSpotPositions(
+        parkingLotId: String,
+        positions: Map<String, SpotPlanPosition?>,
+    ): DataResult<Unit> {
+        savedPositions += positions
+        return positionsResult
     }
 
     override fun reservationsBetween(parkingLotId: String, from: Instant, until: Instant): Flow<DataResult<List<Reservation>>> =

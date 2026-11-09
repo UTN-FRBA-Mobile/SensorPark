@@ -92,6 +92,96 @@ data class SpotDraft(
     }
 }
 
+/** Un problema al cargar un piso o nivel del plano. */
+enum class LevelProblem { NAME_REQUIRED, NAME_TAKEN, IMAGE_REQUIRED }
+
+/** Un piso o nivel del plano que crea o edita el administrador. */
+data class ParkingLevelDraft(
+    val id: String? = null,
+    val name: String = "",
+    val order: Int = 0,
+    val imageBase64: String = "",
+    val imageWidth: Int = 0,
+    val imageHeight: Int = 0,
+) {
+    /** [takenNames] son los nombres de los otros pisos del estacionamiento. */
+    fun problems(takenNames: Set<String>): Set<LevelProblem> = buildSet {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) add(LevelProblem.NAME_REQUIRED)
+        if (trimmed.lowercase() in takenNames.map { it.trim().lowercase() }) add(LevelProblem.NAME_TAKEN)
+        if (imageBase64.isBlank() || imageWidth <= 0 || imageHeight <= 0) add(LevelProblem.IMAGE_REQUIRED)
+    }
+
+    companion object {
+        fun from(level: ParkingLevel) = ParkingLevelDraft(
+            id = level.id,
+            name = level.name,
+            order = level.order,
+            imageBase64 = level.imageBase64,
+            imageWidth = level.imageWidth,
+            imageHeight = level.imageHeight,
+        )
+
+        /** El orden que sigue a los pisos actuales. */
+        fun nextOrder(orders: Collection<Int>): Int = (orders.maxOrNull() ?: 0) + 1
+    }
+}
+
+
+data class PlanSpotPartition(
+    val onCurrentLevel: List<Spot>,
+    val unplaced: List<Spot>,
+    val onOtherLevels: List<Pair<Spot, ParkingLevel>>,
+)
+
+fun partitionSpotsForLevel(
+    spots: List<Spot>,
+    levels: List<ParkingLevel>,
+    currentLevelId: String?,
+    overrides: Map<String, SpotPlanPosition?> = emptyMap(),
+): PlanSpotPartition {
+    val levelById = levels.associateBy { it.id }
+    val onCurrent = mutableListOf<Spot>()
+    val unplaced = mutableListOf<Spot>()
+    val onOther = mutableListOf<Pair<Spot, ParkingLevel>>()
+
+    for (spot in spots.sortedBy { it.code }) {
+        val rawPos = if (spot.id in overrides) overrides[spot.id] else spot.planPosition
+        val validPos = rawPos?.takeIf { it.isValid && it.levelId in levelById }
+        val resolvedSpot = spot.copy(planPosition = validPos)
+        when {
+            validPos == null -> unplaced += resolvedSpot
+            validPos.levelId == currentLevelId -> onCurrent += resolvedSpot
+            else -> levelById[validPos.levelId]?.let { onOther += resolvedSpot to it } ?: run { unplaced += resolvedSpot }
+        }
+    }
+    return PlanSpotPartition(
+        onCurrentLevel = onCurrent,
+        unplaced = unplaced,
+        onOtherLevels = onOther,
+    )
+}
+
+/**
+ * Normaliza un mapa de posiciones editadas garantizando que sólo incluya lugares existentes en
+ * [spots], con pisos válidos en [levels] y coordenadas acotadas a `0f..1f`.
+ */
+fun sanitizeSpotPositions(
+    spots: List<Spot>,
+    levels: List<ParkingLevel>,
+    positions: Map<String, SpotPlanPosition?>,
+): Map<String, SpotPlanPosition?> {
+    val validSpotIds = spots.map { it.id }.toSet()
+    val validLevelIds = levels.map { it.id }.toSet()
+    return positions
+        .filterKeys { it in validSpotIds }
+        .mapValues { (_, pos) ->
+            pos?.takeIf { it.levelId in validLevelIds }?.let {
+                it.copy(x = it.x.coerceIn(0f, 1f), y = it.y.coerceIn(0f, 1f))
+            }
+        }
+}
+
 /** Cómo fue el día de un estacionamiento: sus lugares ahora y sus reservas de hoy (T22). */
 data class DaySummary(
     val free: Int,

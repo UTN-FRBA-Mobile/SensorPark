@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Accessible
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.TwoWheeler
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -32,6 +36,41 @@ import com.sensorpark.core.ui.theme.SensorParkColors
 import com.sensorpark.core.ui.theme.SensorParkTheme
 import com.sensorpark.core.ui.theme.StatusColor
 import com.sensorpark.domain.model.SpotStatus
+import com.sensorpark.domain.model.SpotType
+
+/** Colores específicos por categoría para lugares libres (grilla, plano y leyenda). */
+val PriorityFreeSpotColor = StatusColor(container = Color(0xFFE3F2FD), content = Color(0xFF0D47A1))
+val ElectricFreeSpotColor = StatusColor(container = Color(0xFFFFF8E1), content = Color(0xFFFF6F00))
+val MotorcycleFreeSpotColor = StatusColor(container = Color(0xFFF3E5F5), content = Color(0xFF4A148C))
+val IneligiblePrioritySpotColor = StatusColor(container = Color(0xFFECEFF1), content = Color(0xFF607D8B))
+
+/**
+ * Devuelve el par (fondo, borde/texto) para dibujar un lugar tanto en la matriz como en el plano.
+ * Cuando está libre, usa el color de su categoría ([type]), o [IneligiblePrioritySpotColor] si es
+ * preferencial y el conductor no cumple esa prioridad ([eligible] = `false`).
+ */
+fun spotVisualColor(
+    status: SpotStatus,
+    type: SpotType,
+    colors: SensorParkColors,
+    eligible: Boolean = true,
+): StatusColor = when {
+    status != SpotStatus.FREE -> status.color(colors)
+    !eligible && type == SpotType.PRIORITY -> IneligiblePrioritySpotColor
+    else -> when (type) {
+        SpotType.STANDARD -> colors.positive
+        SpotType.PRIORITY -> PriorityFreeSpotColor
+        SpotType.EV_CHARGING -> ElectricFreeSpotColor
+        SpotType.MOTORCYCLE -> MotorcycleFreeSpotColor
+    }
+}
+
+fun SpotType.legendIcon(): ImageVector? = when (this) {
+    SpotType.STANDARD -> null
+    SpotType.PRIORITY -> Icons.AutoMirrored.Filled.Accessible
+    SpotType.EV_CHARGING -> Icons.Filled.Bolt
+    SpotType.MOTORCYCLE -> Icons.Filled.TwoWheeler
+}
 
 @Composable
 fun SpotStatus.label(): String = stringResource(
@@ -89,6 +128,47 @@ fun SpotStatusChip(
             Spacer(Modifier.width(6.dp))
             Text(
                 text = status.label(),
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+    }
+}
+
+@Composable
+fun SpotTypeLegendChip(
+    type: SpotType,
+    modifier: Modifier = Modifier,
+) {
+    val visualColor = spotVisualColor(
+        status = SpotStatus.FREE,
+        type = type,
+        colors = SensorParkTheme.colors,
+        eligible = true,
+    )
+    val icon = type.legendIcon()
+    val shape = RoundedCornerShape(50)
+
+    Surface(
+        color = visualColor.container,
+        contentColor = visualColor.content,
+        shape = shape,
+        border = BorderStroke(1.dp, visualColor.content.copy(alpha = 0.45f)),
+        modifier = modifier,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+            }
+            Text(
+                text = type.label(),
                 style = MaterialTheme.typography.labelMedium,
             )
         }

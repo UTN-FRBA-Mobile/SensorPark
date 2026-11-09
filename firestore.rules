@@ -93,6 +93,12 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow write: if isAdmin() || managesParkingLot(lotId);
       }
+
+      // Planos de cada piso o nivel del estacionamiento.
+      match /levels/{levelId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin() || managesParkingLot(lotId);
+      }
     }
 
     // Reservas.

@@ -7,6 +7,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.MetadataChanges
 import com.sensorpark.domain.model.DataErrorReason
 import com.sensorpark.domain.model.DataResult
+import com.sensorpark.domain.model.ParkingLevel
 import com.sensorpark.domain.model.SpotAvailability
 import com.sensorpark.domain.repository.SpotAvailabilityRepository
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,26 @@ class SpotAvailabilityRepositoryFirebase @Inject constructor(
             .map { it.toResult() }
             .flowOn(Dispatchers.Default)
             .distinctUntilChanged()
+
+    override fun observeLevels(parkingLotId: String): Flow<DataResult<List<ParkingLevel>>> = callbackFlow {
+        val registration = db.collection(Collections.PARKING_LOTS).document(parkingLotId)
+            .collection(Collections.LEVELS)
+            .addSnapshotListener { snapshot, error ->
+                when {
+                    error != null -> {
+                        trySend(DataResult.Failure(error.toReason()))
+                        close()
+                    }
+                    snapshot != null -> {
+                        val levels = snapshot.documents
+                            .mapNotNull { parkingLevelFrom(it.id, it.data.orEmpty()) }
+                            .sortedWith(compareBy<ParkingLevel> { it.order }.thenBy { it.name })
+                        trySend(DataResult.Success(levels))
+                    }
+                }
+            }
+        awaitClose { registration.remove() }
+    }.flowOn(Dispatchers.Default).distinctUntilChanged()
 
     private fun events(parkingLotId: String): Flow<Event> = callbackFlow {
         // INCLUDE avisa también cuando sólo cambia el origen de los datos (caché o servidor), que es

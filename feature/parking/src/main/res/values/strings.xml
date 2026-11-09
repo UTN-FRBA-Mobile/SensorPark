@@ -22,4 +22,12 @@
     <string name="plan_empty">Este estacionamiento todavía no tiene lugares cargados.</string>
     <string name="plan_category_pregnant">Embarazo</string>
     <string name="plan_category_mobility">Movilidad reducida</string>
+    <string name="plan_view_grid">Grilla</string>
+    <string name="plan_view_map">Plano</string>
+    <string name="plan_no_map_notice">El administrador aún no cargó el plano de este estacionamiento. Podés elegir tu lugar desde la grilla.</string>
+    <string name="plan_level_empty">Todavía no hay lugares marcados en el plano. Podés ver todos los lugares en la vista Grilla.</string>
+    <string name="plan_ineligible_title">Lugar preferencial no disponible</string>
+    <string name="plan_ineligible_pregnant_body">El lugar %1$s es exclusivo para embarazo y tu cuenta no tiene declarada esa categoría. Si te corresponde, podés actualizarla en la pestaña Cuenta.</string>
+    <string name="plan_ineligible_mobility_body">El lugar %1$s es exclusivo para movilidad reducida y tu cuenta no tiene declarada esa categoría. Si te corresponde, podés actualizarla en la pestaña Cuenta.</string>
+    <string name="plan_ineligible_priority_body">El lugar %1$s es de uso preferencial y tu cuenta no tiene declarada esa prioridad. Si te corresponde, podés actualizarla en la pestaña Cuenta.</string>
 </resources>

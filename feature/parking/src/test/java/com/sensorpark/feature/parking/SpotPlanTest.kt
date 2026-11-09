@@ -40,4 +40,21 @@ class SpotPlanTest {
         assertTrue(first == second)
         assertFalse(first == changed)
     }
+
+    @Test
+    fun unLugarPreferencialSoloQuedaHabilitadoParaQuienTieneSuCategoria() {
+        val pregnantSpot = Spot("s-9", "09", SpotType.PRIORITY, SpotStatus.FREE, Category.PREGNANT)
+        val mobilitySpot = Spot("s-10", "10", SpotType.PRIORITY, SpotStatus.FREE, Category.REDUCED_MOBILITY)
+        val standardSpot = Spot("s-1", "01", SpotType.STANDARD, SpotStatus.FREE)
+
+        assertFalse(pregnantSpot.toCell(Category.STANDARD).eligible)
+        assertFalse(pregnantSpot.toCell(Category.REDUCED_MOBILITY).eligible)
+        assertTrue(pregnantSpot.toCell(Category.PREGNANT).eligible)
+
+        assertFalse(mobilitySpot.toCell(Category.STANDARD).eligible)
+        assertFalse(mobilitySpot.toCell(Category.PREGNANT).eligible)
+        assertTrue(mobilitySpot.toCell(Category.REDUCED_MOBILITY).eligible)
+
+        assertTrue(standardSpot.toCell(Category.STANDARD).eligible)
+    }
 }

@@ -5,6 +5,7 @@
     <string name="admin_lots_create">Crear</string>
 
     <string name="admin_panel_tab_spots">Lugares</string>
+    <string name="admin_panel_tab_plan">Plano</string>
     <string name="admin_panel_tab_today">Hoy</string>
     <string name="admin_panel_tab_details">Datos</string>
 
@@ -74,4 +75,24 @@
     <string name="admin_today_chart_hour">%1$d h</string>
     <string name="admin_today_chart_peak">El pico es a las %1$d h, con %2$d reservas.</string>
     <string name="admin_today_chart_empty">Todavía no hay reservas hoy para mostrar la ocupación.</string>
+
+    <!-- Plano del estacionamiento. -->
+    <string name="admin_plan_title">Plano del estacionamiento</string>
+    <string name="admin_plan_delete">Borrar plano</string>
+    <string name="admin_plan_empty">Todavía no cargaste el plano de este estacionamiento. Subí una imagen del plano para ubicar los lugares.</string>
+    <string name="admin_plan_no_spots">Todavía no hay lugares dados de alta en este estacionamiento. Creá los lugares en la pestaña Lugares para poder ubicarlos en el plano.</string>
+    <string name="admin_plan_pick_image">Subir imagen del plano</string>
+    <string name="admin_plan_change_image">Cambiar imagen</string>
+    <string name="admin_plan_image_error">No pudimos leer esa imagen. Probá con otra foto.</string>
+    <string name="admin_plan_delete_title">¿Borrar el plano?</string>
+    <string name="admin_plan_delete_body">Se borrará la imagen del plano y todos los lugares que estaban marcados volverán a quedar pendientes de ubicar.</string>
+    <string name="admin_plan_selected_hint">Lugar %1$s seleccionado · Tocá sobre la imagen para ubicarlo.</string>
+    <string name="admin_plan_unselected_hint">Elegí un lugar de abajo y tocá sobre el plano para ubicarlo, o arrastrá un círculo para moverlo.</string>
+    <string name="admin_plan_remove_spot">Quitar del plano</string>
+    <string name="admin_plan_unplaced_title">Pendientes de ubicar (%1$d)</string>
+    <string name="admin_plan_unplaced_all_done">Todos los lugares están ubicados en el plano.</string>
+    <string name="admin_plan_placed_title">Ubicados en el plano (%1$d)</string>
+    <string name="admin_plan_placed_empty">Todavía no marcaste ningún lugar en el plano.</string>
+    <string name="admin_plan_save_positions">Guardar plano</string>
+    <string name="admin_plan_positions_saved">Posiciones del plano guardadas.</string>
 </resources>

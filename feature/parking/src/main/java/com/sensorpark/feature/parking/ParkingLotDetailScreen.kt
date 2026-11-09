@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,21 +20,34 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
@@ -47,11 +62,14 @@ import com.sensorpark.core.ui.components.ErrorContent
 import com.sensorpark.core.ui.components.FavoriteButton
 import com.sensorpark.core.ui.components.LoadingContent
 import com.sensorpark.core.ui.components.OfflineBanner
+import com.sensorpark.core.ui.components.ParkingLevelPlanBox
 import com.sensorpark.core.ui.components.PrimaryButton
 import com.sensorpark.core.ui.components.label
 import com.sensorpark.core.ui.components.openDirections
 import com.sensorpark.core.ui.theme.SensorParkTheme
+import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.DataResult
+import com.sensorpark.domain.model.ParkingLevel
 import com.sensorpark.domain.model.ParkingLot
 import com.sensorpark.domain.model.Spot
 import com.sensorpark.domain.model.SpotType
@@ -80,8 +98,10 @@ fun ParkingLotDetailScreen(
     }
     val result by vm.result.collectAsStateWithLifecycle()
     val favorite by vm.isFavorite.collectAsStateWithLifecycle()
+    val userCategory by vm.userCategory.collectAsStateWithLifecycle()
     // El listener de los lugares vive sólo mientras la pantalla está visible.
     val spots by spotsVm.state.collectAsStateWithLifecycle()
+    val levels by spotsVm.levels.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
         when (val current = result) {
@@ -90,6 +110,8 @@ fun ParkingLotDetailScreen(
             is DataResult.Success -> Detail(
                 lot = current.value,
                 spots = spots,
+                levels = levels,
+                userCategory = userCategory,
                 favorite = favorite,
                 onToggleFavorite = vm::toggleFavorite,
                 onRetrySpots = spotsVm::retry,
@@ -102,10 +124,15 @@ fun ParkingLotDetailScreen(
 
 private const val GRID_COLUMNS = 4
 
+private enum class PlanViewMode { GRID, PLAN }
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun Detail(
     lot: ParkingLot,
     spots: SpotAvailabilityState,
+    levels: List<ParkingLevel>,
+    userCategory: Category,
     favorite: Boolean,
     onToggleFavorite: () -> Unit,
     onRetrySpots: () -> Unit,
@@ -115,18 +142,36 @@ private fun Detail(
     val context = LocalContext.current
     val directionsUnavailable = stringResource(CoreR.string.directions_unavailable)
 
-    // Las celdas se rearman sólo cuando llega una lista nueva.
-    val cells = remember(spots) {
+    val rawSpots = remember(spots) {
         when (spots) {
-            is SpotAvailabilityState.Live -> spots.spots.map(Spot::toCell)
-            is SpotAvailabilityState.Offline -> spots.spots.map(Spot::toCell)
+            is SpotAvailabilityState.Live -> spots.spots
+            is SpotAvailabilityState.Offline -> spots.spots
             else -> emptyList()
         }
     }
+    // Las celdas se rearman sólo cuando llega una lista nueva o cambia la categoría del conductor.
+    val cells = remember(rawSpots, userCategory) { rawSpots.map { it.toCell(userCategory) } }
     val rows = remember(cells) { cells.chunked(GRID_COLUMNS) }
     val visibleTypes = remember(lot) { SpotType.entries.filter { lot.capacityOf(it) > 0 } }
     val currentOnReserveSpot by rememberUpdatedState(onReserveSpot)
-    val onCellClick = remember { { cell: SpotCell -> currentOnReserveSpot(cell.toSpot()) } }
+    val currentUserCategory by rememberUpdatedState(userCategory)
+    var ineligibleSpot by remember { mutableStateOf<Spot?>(null) }
+
+    val handleSpotSelection: (Spot) -> Unit = remember {
+        { spot: Spot ->
+            if (spot.canBeReservedBy(currentUserCategory)) {
+                currentOnReserveSpot(spot)
+            } else {
+                ineligibleSpot = spot
+            }
+        }
+    }
+    val onCellClick = remember { { cell: SpotCell -> handleSpotSelection(cell.toSpot()) } }
+
+    val currentPlan = remember(levels) { levels.firstOrNull() }
+    var viewMode by rememberSaveable(lot.id, currentPlan != null) {
+        mutableStateOf(if (currentPlan != null) PlanViewMode.PLAN else PlanViewMode.GRID)
+    }
 
     Column(Modifier.fillMaxSize()) {
         Column(
@@ -159,6 +204,58 @@ private fun Detail(
 
             PlanHeader()
 
+            if (levels.isNotEmpty()) {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = viewMode == PlanViewMode.GRID,
+                        onClick = { viewMode = PlanViewMode.GRID },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        icon = {
+                            SegmentedButtonDefaults.Icon(active = viewMode == PlanViewMode.GRID) {
+                                Icon(Icons.Rounded.GridView, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        label = { Text(stringResource(R.string.plan_view_grid)) },
+                    )
+                    SegmentedButton(
+                        selected = viewMode == PlanViewMode.PLAN,
+                        onClick = { viewMode = PlanViewMode.PLAN },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        icon = {
+                            SegmentedButtonDefaults.Icon(active = viewMode == PlanViewMode.PLAN) {
+                                Icon(Icons.Rounded.Map, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        label = { Text(stringResource(R.string.plan_view_map)) },
+                    )
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text(
+                            text = stringResource(R.string.plan_no_map_notice),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
             when {
                 spots is SpotAvailabilityState.Loading -> {
                     Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -177,6 +274,29 @@ private fun Detail(
                         modifier = Modifier.padding(8.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                currentPlan != null && viewMode == PlanViewMode.PLAN -> {
+                    val spotsOnPlan = remember(rawSpots, currentPlan.id) {
+                        rawSpots.filter { spot ->
+                            val pos = spot.planPosition
+                            pos != null && pos.isValid
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        ParkingLevelPlanBox(
+                            level = currentPlan,
+                            spots = spotsOnPlan,
+                            isSpotEligible = { it.canBeReservedBy(userCategory) },
+                            onSpotClick = handleSpotSelection,
+                        )
+                        if (spotsOnPlan.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.plan_level_empty),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
                 else -> {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -227,6 +347,24 @@ private fun Detail(
                 )
             }
         }
+    }
+
+    ineligibleSpot?.let { blockedSpot ->
+        val bodyRes = when (blockedSpot.priorityCategory) {
+            Category.PREGNANT -> R.string.plan_ineligible_pregnant_body
+            Category.REDUCED_MOBILITY -> R.string.plan_ineligible_mobility_body
+            else -> R.string.plan_ineligible_priority_body
+        }
+        AlertDialog(
+            onDismissRequest = { ineligibleSpot = null },
+            title = { Text(stringResource(R.string.plan_ineligible_title)) },
+            text = { Text(stringResource(bodyRes, blockedSpot.code)) },
+            confirmButton = {
+                TextButton(onClick = { ineligibleSpot = null }) {
+                    Text(stringResource(CoreR.string.action_accept))
+                }
+            },
+        )
     }
 }
 

@@ -3,6 +3,7 @@ package com.sensorpark.data.firebase
 import com.google.firebase.firestore.GeoPoint
 import com.sensorpark.domain.model.Coordinates
 import com.sensorpark.domain.model.Schedule
+import com.sensorpark.domain.model.SpotPlanPosition
 import com.sensorpark.domain.model.SpotStatus
 import com.sensorpark.domain.model.SpotType
 import org.junit.Assert.assertEquals
@@ -79,7 +80,38 @@ class ParkingLotMapperTest {
 
         assertEquals(SpotType.PRIORITY, spot.type)
         assertEquals(SpotStatus.RESERVED, spot.status)
+        assertNull(spot.planPosition)
         assertNull(spotFrom("02", mapOf("type" to "VALET", "status" to "FREE")))
         assertNull(spotFrom("03", mapOf("type" to "STANDARD", "status" to "BROKEN")))
+    }
+
+    @Test
+    fun `lee la posicion del lugar en el plano si es valida y la ignora si no`() {
+        val positioned = spotFrom(
+            "01",
+            mapOf("code" to "01", "type" to "STANDARD", "status" to "FREE", "levelId" to "pb", "planX" to 0.25, "planY" to 0.75),
+        )!!
+        assertEquals(SpotPlanPosition("pb", 0.25f, 0.75f), positioned.planPosition)
+
+        val outOfBounds = spotFrom(
+            "02",
+            mapOf("code" to "02", "type" to "STANDARD", "status" to "FREE", "levelId" to "pb", "planX" to 1.5, "planY" to 0.5),
+        )!!
+        assertNull(outOfBounds.planPosition)
+    }
+
+    @Test
+    fun `convierte un piso del plano y descarta los incompletos`() {
+        val level = parkingLevelFrom(
+            "pb",
+            mapOf("name" to "Planta Baja", "order" to 1L, "imageBase64" to "abc", "imageWidth" to 320L, "imageHeight" to 200L),
+        )!!
+        assertEquals("Planta Baja", level.name)
+        assertEquals(1, level.order)
+        assertEquals(320, level.imageWidth)
+        assertEquals(200, level.imageHeight)
+
+        assertNull(parkingLevelFrom("pb", mapOf("name" to " ", "imageBase64" to "abc", "imageWidth" to 320L, "imageHeight" to 200L)))
+        assertNull(parkingLevelFrom("pb", mapOf("name" to "PB", "imageBase64" to "", "imageWidth" to 320L, "imageHeight" to 200L)))
     }
 }

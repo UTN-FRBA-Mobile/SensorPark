@@ -4,11 +4,14 @@ import com.sensorpark.core.testing.FakeParkingLotAdminRepository
 import com.sensorpark.core.testing.FakeParkingLotRepository
 import com.sensorpark.core.testing.FakeSpotAvailabilityRepository
 import com.sensorpark.core.testing.Samples
+import com.sensorpark.domain.model.ParkingLevel
+import com.sensorpark.domain.model.ParkingLevelDraft
 import com.sensorpark.domain.model.ParkingLotField
 import com.sensorpark.domain.model.ReservationOutcome
 import com.sensorpark.domain.model.ReservationRejection
 import com.sensorpark.domain.model.ReservationStatus
 import com.sensorpark.domain.model.SpotDraft
+import com.sensorpark.domain.model.SpotPlanPosition
 import com.sensorpark.domain.model.SpotStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -141,6 +144,37 @@ class AdminViewModelsTest {
         assertEquals(1, summary.free)
         assertEquals(2, summary.reservations)
         assertEquals(1, summary.cancelled)
+    }
+
+    @Test
+    fun elPlanoGuardaPisosYSoloPosicionesDeLugaresReales() = runTest {
+        val pb = ParkingLevel("pb", "Planta Baja", 1, "img", 320, 200)
+        val spots = FakeSpotAvailabilityRepository(
+            availability = Samples.availability(Samples.spot("01"), Samples.spot("02")),
+            levels = listOf(pb),
+        )
+        val vm = panel(spots)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.spots.collect() }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.levels.collect() }
+        vm.load(Samples.UTN_MEDRANO.id)
+
+        var savedLevelId: String? = null
+        val draft = ParkingLevelDraft(name = "1° Subsuelo", order = 2, imageBase64 = "img", imageWidth = 320, imageHeight = 200)
+        vm.saveLevel(draft) { savedLevelId = it }
+        assertEquals(listOf(draft), admin.savedLevels)
+        assertEquals("level-1", savedLevelId)
+
+        vm.saveSpotPositions(
+            mapOf(
+                "spot-01" to SpotPlanPosition("pb", 0.3f, 0.4f),
+                "spot-inexistente" to SpotPlanPosition("pb", 0.5f, 0.5f),
+            ),
+        )
+        assertEquals(
+            mapOf("spot-01" to SpotPlanPosition("pb", 0.3f, 0.4f)),
+            admin.savedPositions.single(),
+        )
+        assertTrue(vm.action.value.savedPositions)
     }
 
     private fun panel(spots: FakeSpotAvailabilityRepository) = ParkingLotPanelViewModel(

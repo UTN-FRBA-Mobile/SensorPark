@@ -26,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -37,12 +39,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import com.sensorpark.core.ui.components.SpotStatusChip
-import com.sensorpark.core.ui.components.color
+import com.sensorpark.core.ui.components.SpotTypeLegendChip
 import com.sensorpark.core.ui.components.icon
 import com.sensorpark.core.ui.components.label
+import com.sensorpark.core.ui.components.spotVisualColor
 import com.sensorpark.core.ui.theme.SensorParkTheme
 import com.sensorpark.domain.model.Category
 import com.sensorpark.domain.model.Spot
+import com.sensorpark.domain.model.SpotPlanPosition
 import com.sensorpark.domain.model.SpotStatus
 import com.sensorpark.domain.model.SpotType
 
@@ -58,13 +62,30 @@ internal data class SpotCell(
     val status: SpotStatus,
     val type: SpotType,
     val category: Category?,
+    val planPosition: SpotPlanPosition? = null,
+    val eligible: Boolean = true,
 ) {
     val isFree: Boolean get() = status == SpotStatus.FREE
 
-    fun toSpot() = Spot(id = id, code = code, type = type, status = status, priorityCategory = category)
+    fun toSpot() = Spot(
+        id = id,
+        code = code,
+        type = type,
+        status = status,
+        priorityCategory = category,
+        planPosition = planPosition,
+    )
 }
 
-internal fun Spot.toCell() = SpotCell(id, code, status, type, priorityCategory)
+internal fun Spot.toCell(userCategory: Category? = null) = SpotCell(
+    id = id,
+    code = code,
+    status = status,
+    type = type,
+    category = priorityCategory,
+    planPosition = planPosition,
+    eligible = userCategory?.let(::canBeReservedBy) ?: true,
+)
 
 private fun SpotType.icon(): ImageVector? = when (this) {
     SpotType.STANDARD -> null
@@ -84,7 +105,13 @@ private fun Category.shortLabel(): String? = when (this) {
 /** Una celda del plano. El estado va también en ícono y descripción, no sólo en color. */
 @Composable
 internal fun SpotCellView(cell: SpotCell, onReserve: (SpotCell) -> Unit, modifier: Modifier = Modifier) {
-    val color = cell.status.color(SensorParkTheme.colors)
+    val color = spotVisualColor(
+        status = cell.status,
+        type = cell.type,
+        colors = SensorParkTheme.colors,
+        eligible = cell.eligible,
+    )
+    val isBlockedPriority = !cell.eligible && cell.isFree && cell.type == SpotType.PRIORITY
     val categoryLabel = cell.category?.takeIf { cell.type == SpotType.PRIORITY }?.shortLabel()
     val statusLabel = cell.status.label()
     val typeLabel = if (cell.type != SpotType.STANDARD) cell.type.label() else null
@@ -96,7 +123,10 @@ internal fun SpotCellView(cell: SpotCell, onReserve: (SpotCell) -> Unit, modifie
             if (categoryLabel != null) append(", ").append(categoryLabel)
         }
     }
-    val borderColor = remember(color.content) { color.content.copy(alpha = 0.35f) }
+    val borderColor = remember(color.content, cell.isFree, cell.type) {
+        if (cell.isFree && cell.type != SpotType.STANDARD) color.content else color.content.copy(alpha = 0.35f)
+    }
+    val borderWidth = if (cell.isFree && cell.type != SpotType.STANDARD) 1.5.dp else 1.dp
 
     CompositionLocalProvider(LocalContentColor provides color.content) {
         Column(
@@ -104,7 +134,23 @@ internal fun SpotCellView(cell: SpotCell, onReserve: (SpotCell) -> Unit, modifie
                 .aspectRatio(1f)
                 .clip(SpotCellShape)
                 .background(color.container, SpotCellShape)
-                .border(1.dp, borderColor, SpotCellShape)
+                .then(
+                    if (isBlockedPriority) {
+                        Modifier.drawWithContent {
+                            drawContent()
+                            val inset = size.width * 0.12f
+                            drawLine(
+                                color = color.content.copy(alpha = 0.7f),
+                                start = Offset(inset, size.height - inset),
+                                end = Offset(size.width - inset, inset),
+                                strokeWidth = 2.dp.toPx(),
+                            )
+                        }
+                    } else {
+                        Modifier
+                    },
+                )
+                .border(borderWidth, borderColor, SpotCellShape)
                 .clickable(
                     enabled = cell.isFree,
                     role = Role.Button,
@@ -139,7 +185,7 @@ internal fun SpotCellView(cell: SpotCell, onReserve: (SpotCell) -> Unit, modifie
     }
 }
 
-/** La leyenda de colores del plano, una pastilla por estado. */
+/** La leyenda de colores del plano: estados y colores por categoría de lugar libre. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SpotLegend(modifier: Modifier = Modifier) {
@@ -149,5 +195,8 @@ internal fun SpotLegend(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         SpotStatus.entries.forEach { SpotStatusChip(status = it) }
+        SpotTypeLegendChip(type = SpotType.PRIORITY)
+        SpotTypeLegendChip(type = SpotType.EV_CHARGING)
+        SpotTypeLegendChip(type = SpotType.MOTORCYCLE)
     }
 }
